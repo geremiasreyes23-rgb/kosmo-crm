@@ -3,7 +3,9 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { canViewAll, type SessionUser } from "@/lib/auth";
 import { calculateAge } from "@/lib/utils";
-import type { DashboardSummary } from "@/types";
+import { getTasksForUser } from "../tasks/data";
+import { getAppointmentsForUser } from "../calendar/data";
+import type { DashboardSummary, CrmTask, AppointmentItem } from "@/types";
 
 const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -151,4 +153,26 @@ export async function getTurning65Alerts(
     .sort((a, b) => a.turns65On.localeCompare(b.turns65On))
     .slice(0, 6);
   return rows.map((r) => ({ clientName: r.clientName, turns65On: r.turns65On }));
+}
+
+/** Top 5 tareas pendientes/en curso, más próximas por fecha de vencimiento
+ * primero — reusa getTasksForUser (mismo alcance por rol) y solo recorta
+ * para la tarjeta del dashboard, sin duplicar la consulta ni el mapeo. */
+export async function getUpcomingTasksForDashboard(user: SessionUser): Promise<CrmTask[]> {
+  const tasks = await getTasksForUser(user);
+  return tasks
+    .filter((t) => t.status === "PENDING" || t.status === "IN_PROGRESS")
+    .sort((a, b) => (a.dueDate || "9999").localeCompare(b.dueDate || "9999"))
+    .slice(0, 5);
+}
+
+/** Top 5 próximas citas (desde ahora en adelante) — mismo criterio que la
+ * tarjeta de tareas: reusa getAppointmentsForUser y recorta. */
+export async function getUpcomingAppointmentsForDashboard(user: SessionUser): Promise<AppointmentItem[]> {
+  const appointments = await getAppointmentsForUser(user);
+  const now = Date.now();
+  return appointments
+    .filter((a) => (a.status === "SCHEDULED" || a.status === "CONFIRMED") && new Date(a.startsAt).getTime() >= now)
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+    .slice(0, 5);
 }

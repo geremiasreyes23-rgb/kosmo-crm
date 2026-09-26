@@ -33,8 +33,11 @@ function mapAppointment(row: AppointmentRow): AppointmentItem {
 
 /** Alcance: sin "*:view_all", un vendedor ve las citas que agendó él mismo,
  * o las ligadas a un lead/cliente suyo. */
-export async function getAppointmentsForUser(user: SessionUser): Promise<AppointmentItem[]> {
-  const where: Prisma.AppointmentWhereInput | undefined = canViewAll(user)
+export async function getAppointmentsForUser(
+  user: SessionUser,
+  filter?: { clientId?: string; leadId?: string }
+): Promise<AppointmentItem[]> {
+  const rbacWhere: Prisma.AppointmentWhereInput | undefined = canViewAll(user)
     ? undefined
     : {
         OR: [
@@ -43,6 +46,12 @@ export async function getAppointmentsForUser(user: SessionUser): Promise<Appoint
           { client: { agentId: user.agentId ?? "__sin-agente__" } },
         ],
       };
+
+  const where: Prisma.AppointmentWhereInput = {
+    ...(rbacWhere ?? {}),
+    ...(filter?.clientId ? { clientId: filter.clientId } : {}),
+    ...(filter?.leadId ? { leadId: filter.leadId } : {}),
+  };
 
   const rows = await prisma.appointment.findMany({
     where,

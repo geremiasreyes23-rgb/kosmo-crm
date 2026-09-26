@@ -14,7 +14,10 @@ import { getClientForUser } from "../data";
 import { getMedicareProfileForClient, getMedicareFormOptions } from "./medicare/data";
 import { getObamacareProfileForClient, getObamacareFormOptions } from "./obamacare/data";
 import { getFamilyHeritageProfileForClient } from "./family-heritage/data";
-import { formatCurrency, formatDate, timeSince, calculateAge } from "@/lib/utils";
+import { getActivitiesForUser } from "../../activities/data";
+import { getTasksForUser } from "../../tasks/data";
+import { getAppointmentsForUser } from "../../calendar/data";
+import { formatCurrency, formatDate, formatTime, timeSince, calculateAge } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { ArrowLeftCircle, ClipboardList, ShieldCheck } from "lucide-react";
 
@@ -31,14 +34,25 @@ export default async function ClientDetailPage({
   if (!client) return notFound();
 
   const canEditClient = hasPermission(user, "clients", "edit");
-  const [medicareProfile, medicareOptions, obamacareProfile, obamacareOptions, familyHeritageProfile] =
-    await Promise.all([
-      getMedicareProfileForClient(id, user),
-      getMedicareFormOptions(),
-      getObamacareProfileForClient(id, user),
-      getObamacareFormOptions(),
-      getFamilyHeritageProfileForClient(id, user),
-    ]);
+  const [
+    medicareProfile,
+    medicareOptions,
+    obamacareProfile,
+    obamacareOptions,
+    familyHeritageProfile,
+    clientActivities,
+    clientTasks,
+    clientAppointments,
+  ] = await Promise.all([
+    getMedicareProfileForClient(id, user),
+    getMedicareFormOptions(),
+    getObamacareProfileForClient(id, user),
+    getObamacareFormOptions(),
+    getFamilyHeritageProfileForClient(id, user),
+    getActivitiesForUser(user, { clientId: id }),
+    getTasksForUser(user, { clientId: id }),
+    getAppointmentsForUser(user, { clientId: id }),
+  ]);
 
   const policies = client.policies ?? [];
   const totalCommissions = policies.reduce((sum, p) => sum + (p.commission?.agentAmount ?? 0), 0);
@@ -174,56 +188,77 @@ export default async function ClientDetailPage({
               {
                 id: "sales",
                 label: "Ventas",
-                content: (
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    El módulo de Ventas todavía no está conectado a base de datos real (fase posterior).
-                  </p>
-                ),
+                content: <Empty text="Sin ventas registradas para este cliente todavía." />,
               },
               {
                 id: "activities",
                 label: "Actividades",
-                content: (
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    El módulo de Actividades todavía no está conectado a base de datos real (fase posterior).
-                  </p>
-                ),
+                content:
+                  clientActivities.length === 0 ? (
+                    <Empty text="Sin actividades registradas todavía." />
+                  ) : (
+                    <div className="space-y-2">
+                      {clientActivities.map((a) => (
+                        <div key={a.id} className="flex items-start justify-between gap-3 rounded-lg border border-[var(--border-hairline)] p-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{a.type} · {a.user}</p>
+                            {a.notes && <p className="mt-0.5 text-sm text-[var(--ink-secondary)]">{a.notes}</p>}
+                          </div>
+                          <span className="shrink-0 text-xs text-[var(--ink-muted)]">{formatDate(a.occurredAt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ),
               },
               {
                 id: "tasks",
                 label: "Tareas",
-                content: (
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    El módulo de Tareas todavía no está conectado a base de datos real (fase posterior).
-                  </p>
-                ),
+                content:
+                  clientTasks.length === 0 ? (
+                    <Empty text="Sin tareas asociadas todavía." />
+                  ) : (
+                    <div className="space-y-2">
+                      {clientTasks.map((t) => (
+                        <div key={t.id} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-hairline)] p-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{t.title}</p>
+                            <p className="text-xs text-[var(--ink-muted)]">Asignada a {t.assignedTo}{t.dueDate ? ` · vence ${formatDate(t.dueDate)}` : ""}</p>
+                          </div>
+                          <Badge status={statusToBadgeVariant(t.status)}>{t.status}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ),
               },
               {
                 id: "appointments",
                 label: "Citas",
-                content: (
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    El módulo de Citas todavía no está conectado a base de datos real (fase posterior).
-                  </p>
-                ),
+                content:
+                  clientAppointments.length === 0 ? (
+                    <Empty text="Sin citas agendadas todavía." />
+                  ) : (
+                    <div className="space-y-2">
+                      {clientAppointments.map((ap) => (
+                        <div key={ap.id} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-hairline)] p-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{ap.title}</p>
+                            <p className="text-xs text-[var(--ink-muted)]">{formatDate(ap.startsAt)} · {formatTime(ap.startsAt)}</p>
+                          </div>
+                          <Badge status={statusToBadgeVariant(ap.status)}>{ap.status}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ),
               },
               {
                 id: "documents",
                 label: "Documentos",
-                content: (
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    El módulo de Documentos todavía no está conectado a base de datos real (fase posterior).
-                  </p>
-                ),
+                content: <Empty text="Sin documentos adjuntos todavía." />,
               },
               {
                 id: "notes",
                 label: "Notas",
-                content: (
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    El módulo de Notas todavía no está conectado a base de datos real (fase posterior).
-                  </p>
-                ),
+                content: <Empty text="Sin notas registradas todavía." />,
               },
               {
                 id: "insurance",
@@ -284,7 +319,7 @@ export default async function ClientDetailPage({
                 label: "Historial",
                 content: (
                   <div className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
-                    <ClipboardList className="h-4 w-4" /> El log de auditoría se activa en Fase 13.
+                    <ClipboardList className="h-4 w-4" /> Sin historial de cambios todavía.
                   </div>
                 ),
               },

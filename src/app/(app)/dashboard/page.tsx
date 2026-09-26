@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
-import { Badge } from "@/components/ui/Badge";
+import { Badge, statusToBadgeVariant } from "@/components/ui/Badge";
 import { SimpleBarChart } from "@/components/charts/SimpleBarChart";
 import { SimpleLineChart } from "@/components/charts/SimpleLineChart";
 import { Select } from "@/components/ui/Field";
@@ -12,8 +12,11 @@ import {
   getSalesTrendChart,
   getAgentPerformance,
   getTurning65Alerts,
+  getUpcomingTasksForDashboard,
+  getUpcomingAppointmentsForDashboard,
 } from "./data";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatTime } from "@/lib/utils";
+import Link from "next/link";
 import {
   UserPlus,
   UserCheck,
@@ -30,13 +33,16 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const [s, salesByLineChart, salesTrendChart, agentPerformance, turning65Alerts] = await Promise.all([
-    getDashboardSummary(user),
-    getSalesByLineChart(user),
-    getSalesTrendChart(user),
-    getAgentPerformance(user),
-    getTurning65Alerts(user),
-  ]);
+  const [s, salesByLineChart, salesTrendChart, agentPerformance, turning65Alerts, upcomingTasks, upcomingAppointments] =
+    await Promise.all([
+      getDashboardSummary(user),
+      getSalesByLineChart(user),
+      getSalesTrendChart(user),
+      getAgentPerformance(user),
+      getTurning65Alerts(user),
+      getUpcomingTasksForDashboard(user),
+      getUpcomingAppointmentsForDashboard(user),
+    ]);
 
   return (
     <div>
@@ -114,8 +120,21 @@ export default async function DashboardPage() {
               <ListTodo className="h-4 w-4" /> Tareas pendientes
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <Empty text="El módulo de Tareas todavía no está conectado a base de datos real (fase posterior)." />
+          <CardContent className="space-y-1">
+            {upcomingTasks.map((t) => (
+              <Link
+                key={t.id}
+                href="/tasks"
+                className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-hover)]"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{t.title}</p>
+                  <p className="truncate text-xs text-[var(--ink-muted)]">{t.relatedTo}</p>
+                </div>
+                <Badge status={statusToBadgeVariant(t.priority)}>{t.dueDate ? formatDate(t.dueDate) : "Sin fecha"}</Badge>
+              </Link>
+            ))}
+            {upcomingTasks.length === 0 && <Empty text="No tienes tareas pendientes." />}
           </CardContent>
         </Card>
 
@@ -125,8 +144,23 @@ export default async function DashboardPage() {
               <CalendarClock className="h-4 w-4" /> Próximas citas
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <Empty text="El módulo de Citas todavía no está conectado a base de datos real (fase posterior)." />
+          <CardContent className="space-y-1">
+            {upcomingAppointments.map((a) => (
+              <Link
+                key={a.id}
+                href="/calendar"
+                className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-hover)]"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{a.title}</p>
+                  <p className="truncate text-xs text-[var(--ink-muted)]">{a.relatedTo}</p>
+                </div>
+                <Badge status="info">
+                  {formatDate(a.startsAt)} · {formatTime(a.startsAt)}
+                </Badge>
+              </Link>
+            ))}
+            {upcomingAppointments.length === 0 && <Empty text="No tienes citas próximas." />}
           </CardContent>
         </Card>
       </div>

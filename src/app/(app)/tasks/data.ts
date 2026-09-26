@@ -37,8 +37,11 @@ function mapTask(row: TaskRow): CrmTask {
 /** Alcance: sin "*:view_all", un vendedor ve las tareas asignadas a él, o
  * las ligadas a un lead/cliente suyo (aunque se las haya asignado otra
  * persona, ej. un manager). */
-export async function getTasksForUser(user: SessionUser): Promise<CrmTask[]> {
-  const where: Prisma.TaskWhereInput | undefined = canViewAll(user)
+export async function getTasksForUser(
+  user: SessionUser,
+  filter?: { clientId?: string; leadId?: string }
+): Promise<CrmTask[]> {
+  const rbacWhere: Prisma.TaskWhereInput | undefined = canViewAll(user)
     ? undefined
     : {
         OR: [
@@ -47,6 +50,12 @@ export async function getTasksForUser(user: SessionUser): Promise<CrmTask[]> {
           { client: { agentId: user.agentId ?? "__sin-agente__" } },
         ],
       };
+
+  const where: Prisma.TaskWhereInput = {
+    ...(rbacWhere ?? {}),
+    ...(filter?.clientId ? { clientId: filter.clientId } : {}),
+    ...(filter?.leadId ? { leadId: filter.leadId } : {}),
+  };
 
   const rows = await prisma.task.findMany({
     where,

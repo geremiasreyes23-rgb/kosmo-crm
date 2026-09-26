@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
+import { Badge, statusToBadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
 import { requireUser } from "@/lib/auth";
 import { getLeadForUser, getLeadPipelineStages } from "../data";
+import { getActivitiesForUser } from "../../activities/data";
+import { getTasksForUser } from "../../tasks/data";
 import { formatDate } from "@/lib/utils";
 import { ConvertToClientButton } from "@/components/leads/ConvertToClientButton";
 import { UserCheck } from "lucide-react";
@@ -20,7 +22,12 @@ export default async function LeadDetailPage({
 }) {
   const { id } = await params;
   const user = await requireUser();
-  const [lead, stages] = await Promise.all([getLeadForUser(id, user), getLeadPipelineStages()]);
+  const [lead, stages, leadActivities, leadTasks] = await Promise.all([
+    getLeadForUser(id, user),
+    getLeadPipelineStages(),
+    getActivitiesForUser(user, { leadId: id }),
+    getTasksForUser(user, { leadId: id }),
+  ]);
   if (!lead) return notFound();
   const stage = stages.find((s) => s.id === lead.stageId);
 
@@ -87,20 +94,42 @@ export default async function LeadDetailPage({
                   {
                     id: "activities",
                     label: "Actividades",
-                    content: (
-                      <p className="text-sm text-[var(--ink-muted)]">
-                        El módulo de Actividades todavía no está conectado a base de datos real (fase posterior).
-                      </p>
-                    ),
+                    content:
+                      leadActivities.length === 0 ? (
+                        <p className="text-sm text-[var(--ink-muted)]">Sin actividades registradas todavía.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {leadActivities.map((a) => (
+                            <div key={a.id} className="flex items-start justify-between gap-3 rounded-lg border border-[var(--border-hairline)] p-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium">{a.type} · {a.user}</p>
+                                {a.notes && <p className="mt-0.5 text-sm text-[var(--ink-secondary)]">{a.notes}</p>}
+                              </div>
+                              <span className="shrink-0 text-xs text-[var(--ink-muted)]">{formatDate(a.occurredAt)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ),
                   },
                   {
                     id: "tasks",
                     label: "Tareas",
-                    content: (
-                      <p className="text-sm text-[var(--ink-muted)]">
-                        El módulo de Tareas todavía no está conectado a base de datos real (fase posterior).
-                      </p>
-                    ),
+                    content:
+                      leadTasks.length === 0 ? (
+                        <p className="text-sm text-[var(--ink-muted)]">Sin tareas asociadas todavía.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {leadTasks.map((t) => (
+                            <div key={t.id} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-hairline)] p-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium">{t.title}</p>
+                                <p className="text-xs text-[var(--ink-muted)]">Asignada a {t.assignedTo}{t.dueDate ? ` · vence ${formatDate(t.dueDate)}` : ""}</p>
+                              </div>
+                              <Badge status={statusToBadgeVariant(t.status)}>{t.status}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      ),
                   },
                   { id: "notes", label: "Notas", content: <p className="text-sm text-[var(--ink-muted)]">Sin notas todavía.</p> },
                   { id: "documents", label: "Documentos", content: <p className="text-sm text-[var(--ink-muted)]">Sin documentos adjuntos.</p> },

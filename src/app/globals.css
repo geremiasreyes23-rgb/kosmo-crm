@@ -38,10 +38,12 @@
   --status-info: #1c5cab;
   --status-info-bg: #e8f0fb;
 
-  /* Tipografía de marca KOSMO — Century Gothic (look corporativo pedido
-     explícitamente), ya presente en Windows/Office, así que no depende
-     de red ni de Google Fonts. */
-  --font-kosmo: "Century Gothic", CenturyGothic, "Segoe UI", system-ui, sans-serif;
+  /* Tipografía global — Inter (cargada vía next/font en layout.tsx, que
+     define --font-inter). Reemplaza a Century Gothic: se mantiene el
+     nombre de variable --font-kosmo para no tener que tocar cada
+     componente que ya la referencia. Fallbacks por si next/font no llegó
+     a inyectar la variable (SSR muy temprano, etc.). */
+  --font-kosmo: var(--font-inter), "Segoe UI", system-ui, sans-serif;
 
   /* Mensajería — estilo de chat tipo WhatsApp/Bitrix24 pedido explícitamente:
      fondo rosado con textura sutil de puntos, burbujas propias en verde

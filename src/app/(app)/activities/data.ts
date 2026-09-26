@@ -34,8 +34,11 @@ function mapActivity(row: ActivityRow): ActivityItem {
 /** Alcance: sin "*:view_all", un vendedor ve las actividades que registró
  * él mismo, o las que están ligadas a un lead/cliente suyo (aunque las haya
  * registrado otra persona, ej. un manager cubriendo su cartera). */
-export async function getActivitiesForUser(user: SessionUser): Promise<ActivityItem[]> {
-  const where: Prisma.ActivityWhereInput | undefined = canViewAll(user)
+export async function getActivitiesForUser(
+  user: SessionUser,
+  filter?: { clientId?: string; leadId?: string }
+): Promise<ActivityItem[]> {
+  const rbacWhere: Prisma.ActivityWhereInput | undefined = canViewAll(user)
     ? undefined
     : {
         OR: [
@@ -45,11 +48,21 @@ export async function getActivitiesForUser(user: SessionUser): Promise<ActivityI
         ],
       };
 
+  // Combinar el alcance por rol con un filtro puntual (ficha de un lead o
+  // cliente específico) — al ser claves distintas en el mismo objeto,
+  // Prisma las combina con AND: "cumple el alcance del rol Y pertenece a
+  // este lead/cliente".
+  const where: Prisma.ActivityWhereInput = {
+    ...(rbacWhere ?? {}),
+    ...(filter?.clientId ? { clientId: filter.clientId } : {}),
+    ...(filter?.leadId ? { leadId: filter.leadId } : {}),
+  };
+
   const rows = await prisma.activity.findMany({
     where,
     include: activityInclude,
     orderBy: { occurredAt: "desc" },
-    take: 200,
+    take: filter ? 50 : 200,
   });
   return rows.map(mapActivity);
 }
