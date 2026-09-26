@@ -1,0 +1,55 @@
+import "server-only";
+
+import type { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db";
+import { canViewAll, type SessionUser } from "@/lib/auth";
+import type { ActivityItem } from "@/types";
+
+const activityInclude = {
+  user: true,
+  lead: { select: { firstName: true, lastName: true } },
+  client: { select: { firstName: true, lastName: true } },
+} satisfies Prisma.ActivityInclude;
+
+type ActivityRow = Prisma.ActivityGetPayload<{ include: typeof activityInclude }>;
+
+function mapActivity(row: ActivityRow): ActivityItem {
+  const relatedTo = row.lead
+    ? `${row.lead.firstName} ${row.lead.lastName}`
+    : row.client
+      ? `${row.client.firstName} ${row.client.lastName}`
+      : "—";
+  return {
+    id: row.id,
+    type: row.type as ActivityItem["type"],
+    relatedTo,
+    relatedLeadId: row.leadId ?? undefined,
+    relatedClientId: row.clientId ?? undefined,
+    user: `${row.user.firstName} ${row.user.lastName}`,
+    occurredAt: row.occurredAt.toISOString(),
+    notes: row.notes ?? undefined,
+  };
+}
+
+/** Alcance: sin "*:view_all", un vendedor ve las actividades que registró
+ * él mismo, o las que están ligadas a un lead/cliente suyo (aunque las haya
+ * registrado otra persona, ej. un manager cubriendo su cartera). */
+export async function getActivitiesForUser(user: SessionUser): Promise<ActivityItem[]> {
+  const where: Prisma.ActivityWhereInput | undefined = canViewAll(user)
+    ? undefined
+    : {
+        OR: [
+          { userId: user.id },
+          { lead: { agentId: user.agentId ?? "__sin-agente__" } },
+          { client: { agentId: user.agentId ?? "__sin-agente__" } },
+        ],
+      };
+
+  const rows = await prisma.activity.findMany({
+    where,
+    include: activityInclude,
+    orderBy: { occurredAt: "desc" },
+    take: 200,
+  });
+  return rows.map(mapActivity);
+}

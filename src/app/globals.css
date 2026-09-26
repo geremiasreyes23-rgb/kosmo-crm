@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+
+  /* Superficies */
+  --surface-page: #f9f9f7;
+  --surface-card: #ffffff;
+  --surface-sunken: #f3f3f1;
+  --surface-hover: #eef1f5;
+
+  /* Marca (paleta validada dataviz, slot 1 = azul) */
+  --brand-50: #eaf2fc;
+  --brand-100: #cde2fb;
+  --brand-300: #6da7ec;
+  --brand-500: #2a78d6;
+  --brand-600: #1c5cab;
+  --brand-700: #184f95;
+
+  /* Tinta */
+  --ink-primary: #0b0b0b;
+  --ink-secondary: #52514e;
+  --ink-muted: #898781;
+
+  /* Bordes / líneas */
+  --border-hairline: rgba(11, 11, 11, 0.1);
+  --border-grid: #e1e0d9;
+
+  /* Estado (paleta fija, no temática) */
+  --status-good: #0ca30c;
+  --status-good-bg: #e6f6e6;
+  --status-warning: #b9790f;
+  --status-warning-bg: #fdf1da;
+  --status-serious: #c85a34;
+  --status-serious-bg: #fbe9e1;
+  --status-critical: #d03b3b;
+  --status-critical-bg: #fbe4e4;
+  --status-info: #1c5cab;
+  --status-info-bg: #e8f0fb;
+
+  /* Tipografía de marca KOSMO — Century Gothic (look corporativo pedido
+     explícitamente), ya presente en Windows/Office, así que no depende
+     de red ni de Google Fonts. */
+  --font-kosmo: "Century Gothic", CenturyGothic, "Segoe UI", system-ui, sans-serif;
+
+  /* Mensajería — estilo de chat tipo WhatsApp/Bitrix24 pedido explícitamente:
+     fondo rosado con textura sutil de puntos, burbujas propias en verde
+     claro, ajenas en blanco, check de "leído" en azul. Son variables propias
+     (no --brand-*) porque este look de chat es independiente del color de
+     marca del resto del CRM. */
+  --chat-wallpaper: #f3dcd9;
+  --chat-wallpaper-dot: rgba(0, 0, 0, 0.045);
+  --chat-bubble-own-bg: #dcf8c6;
+  --chat-bubble-own-text: #0c2e0c;
+  --chat-bubble-own-meta: rgba(12, 46, 12, 0.55);
+  --chat-bubble-own-mention: #0a5c8a;
+  --chat-bubble-other-bg: #ffffff;
+  --chat-bubble-other-text: var(--ink-primary);
+  --chat-check-read: #34b7f1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-page: #0d0d0d;
+    --surface-card: #17171a;
+    --surface-sunken: #1a1a19;
+    --surface-hover: #202024;
+    --ink-primary: #ffffff;
+    --ink-secondary: #c3c2b7;
+    --ink-muted: #898781;
+    --border-hairline: rgba(255, 255, 255, 0.1);
+    --border-grid: #2c2c2a;
+    --brand-500: #3987e5;
+
+    --chat-wallpaper: #241a1c;
+    --chat-wallpaper-dot: rgba(255, 255, 255, 0.05);
+    --chat-bubble-own-bg: #045c4a;
+    --chat-bubble-own-text: #eafff2;
+    --chat-bubble-own-meta: rgba(234, 255, 242, 0.65);
+    --chat-bubble-own-mention: #7fd7ff;
+    --chat-bubble-other-bg: #202c33;
+    --chat-bubble-other-text: var(--ink-primary);
+    --chat-check-read: #53bdeb;
+  }
+}
+
+* {
+  border-color: var(--border-hairline);
+}
+
+body {
+  background: var(--surface-page);
+  color: var(--ink-primary);
+  font-family: var(--font-kosmo);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-grid);
+  border-radius: 8px;
+}
+
+/* ————————————————————————————————————————————————————————————
+   Animaciones — set compartido de keyframes para micro-interacciones
+   (Drawer, Tabs, Kanban, menús, etc.) para no repetirlos por componente.
+   ———————————————————————————————————————————————————————————— */
+@keyframes kosmo-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes kosmo-fade-in-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes kosmo-fade-in-scale {
+  from { opacity: 0; transform: scale(0.96) translateY(-2px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+/* Para pasos que se reemplazan dentro de una misma tarjeta (ej. el login
+   pasando de "correo" a "contraseña") — el contenido nuevo entra desde
+   arriba, como si se deslizara hacia abajo para tomar el lugar del
+   anterior, en vez de aparecer de golpe. */
+@keyframes kosmo-slide-down-in {
+  from { opacity: 0; transform: translateY(-14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes kosmo-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+/* Pantalla de bienvenida tras un login correcto — el logo "crece" y se
+   asienta en el centro de la pantalla mientras el resto del contenido
+   (tarjeta, texto) ya desapareció, y el saludo con el nombre entra un
+   toque después para que se lea como una secuencia, no todo de golpe. */
+@keyframes kosmo-welcome-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.88); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Punto de estado "jornada activa" del Smart Clock (menú de perfil) — un
+   anillo que se expande y se desvanece, sutil, no un parpadeo llamativo. */
+@keyframes kosmo-status-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(12, 163, 12, 0.35); }
+  70% { box-shadow: 0 0 0 5px rgba(12, 163, 12, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(12, 163, 12, 0); }
+}
+/* Misma idea, para el punto de estado "en pausa" — mismo pulso, en el tono
+   ámbar de --status-warning en vez del verde de "jornada activa". */
+@keyframes kosmo-status-pulse-warning {
+  0% { box-shadow: 0 0 0 0 rgba(185, 121, 15, 0.32); }
+  70% { box-shadow: 0 0 0 5px rgba(185, 121, 15, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(185, 121, 15, 0); }
+}
+
+.animate-kosmo-fade-in { animation: kosmo-fade-in 0.18s ease-out both; }
+.animate-kosmo-fade-in-up { animation: kosmo-fade-in-up 0.22s ease-out both; }
+.animate-kosmo-fade-in-scale { animation: kosmo-fade-in-scale 0.15s ease-out both; }
+.animate-kosmo-slide-down-in { animation: kosmo-slide-down-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-kosmo-pop { animation: kosmo-pop 0.4s ease-out; }
+.animate-kosmo-welcome-in { animation: kosmo-welcome-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-kosmo-welcome-in-delay { animation: kosmo-welcome-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: 0.18s; }
+.animate-kosmo-status-pulse { animation: kosmo-status-pulse 2s infinite; }
+.animate-kosmo-status-pulse-warning { animation: kosmo-status-pulse-warning 2s infinite; }
+
+/* Fondo por defecto del chat en Mensajería (cuando el usuario no eligió un
+   color propio en ChatWallpaperPicker) — color rosado + textura de puntos
+   muy sutil, mismo espíritu que el "wallpaper" de apps de mensajería
+   conocidas, sin reproducir ningún ícono/artwork de terceros. */
+.kosmo-chat-bg {
+  background-color: var(--chat-wallpaper);
+  background-image: radial-gradient(circle, var(--chat-wallpaper-dot) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Respeta la preferencia de "reducir movimiento" del sistema operativo —
+   apaga animaciones y transiciones en todo el CRM sin tener que hacerlo
+   componente por componente. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

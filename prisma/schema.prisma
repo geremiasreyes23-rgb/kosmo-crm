@@ -1,0 +1,1348 @@
+// ============================================================================
+// Alliance Insurance CRM — Modelo de datos (Fase 1)
+// ============================================================================
+// Este schema es el CONTRATO de datos del sistema. No se conecta todavía a una
+// base de datos real (eso ocurre en Fase 2, junto con Auth). Se entrega ahora
+// para validar el modelo relacional antes de escribir código de backend.
+//
+// Principios de diseño:
+// 1. Lead / Client / Policy / Commission son entidades separadas (nunca una
+//    tabla gigante de "clientes" con 200 columnas).
+// 2. Cada línea de negocio (Medicare, Obamacare, Family Heritage) tiene su
+//    propia tabla de perfil 1:1 con Client — así una línea nueva (Vida,
+//    Dental, ...) se agrega como tabla nueva sin tocar Client.
+// 3. Nada de catálogos hardcodeados: LeadSource, Pipeline, PipelineStage,
+//    InsuranceLine, Carrier, CommissionRate, CustomField son configurables
+//    desde el módulo de Configuración.
+// 4. Todo cambio de etapa, de vendedor o acceso a datos sensibles queda
+//    trazado (PipelineHistory, AuditLog, SensitiveDataAccessLog).
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// 1. USUARIOS, ROLES Y PERMISOS (RBAC)
+// ---------------------------------------------------------------------------
+
+model User {
+  id                  String   @id @default(cuid())
+  firstName           String
+  lastName             String
+  email                String   @unique
+  passwordHash         String
+  // Obliga a cambiar la contraseña en el próximo login — se activa al crear
+  // el usuario con contraseña temporal o al restablecerla desde Configuración.
+  mustChangePassword   Boolean  @default(true)
+  roleId               String
+  role                 Role     @relation(fields: [roleId], references: [id])
+  agentId              String?  @unique
+  agent                Agent?   @relation(fields: [agentId], references: [id])
+  status               UserStatus @default(ACTIVE)
+  lastLoginAt          DateTime?
+  // Perfil personal — lo edita cada usuario desde "Mi perfil" (no requiere
+  // permiso de Admin, a diferencia de nombre/correo/rol que sí lo requieren).
+  avatarUrl            String?  // data URL (imagen embebida) o URL externa
+  phone                String?
+  jobTitle             String?  // cargo, texto libre — no reemplaza Role
+  birthday             DateTime? @db.Date
+  // Ficha de perfil (sección "Perfil de usuario") — opcionales a propósito:
+  // hoy nadie los llena todavía (no hay UI de edición para ellos aún, solo
+  // de lectura), así que la página de perfil los muestra como "No
+  // especificado" hasta que se conecte un formulario/admin que los cargue.
+  coverPhotoUrl        String?  // banner del perfil — data URL, igual que avatarUrl
+  department           String?
+  city                 String?
+  phoneExtension       String?
+  notificationLanguage String?
+  workFormat           String?  // ej. "Remoto", "Híbrido", "Presencial" — texto libre por ahora
+  supervisorId         String?
+  supervisor           User?    @relation("UserSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull)
+  directReports        User[]   @relation("UserSupervisor")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  sessions              Session[]
+  timeEntries           TimeEntry[]
+  tasksAssigned         Task[]
+  activities            Activity[]
+  dailyReports          DailyReport[] @relation("DailyReportAuthor")
+  dailyReportsReviewed  DailyReport[] @relation("DailyReportReviewer")
+  appointments          Appointment[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+  sensitiveAccessLog    SensitiveDataAccessLog[]
+  documentsUploaded     Document[]
+  recognitionsReceived  Recognition[] @relation("RecognitionTo")
+  recognitionsGiven     Recognition[] @relation("RecognitionFrom")
+
+  conversationsAsA      Conversation[] @relation("ConversationUserA")
+  conversationsAsB      Conversation[] @relation("ConversationUserB")
+  messagesSent          Message[]      @relation("MessagesSent")
+  conversationReads     ConversationRead[] @relation("ConversationReads")
+
+  // Correo interno (sección 15) — un usuario tiene a lo sumo un buzón, creado
+  // automáticamente al crearse el usuario (ver ensureMailboxForUser en
+  // src/lib/mail/mailbox.ts, también usado como backfill perezoso para
+  // cuentas que ya existían antes de esta migración).
+  internalMailbox InternalMailbox?
+  mailAuditLogs   MailAuditLog[]
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+// Sesiones en base de datos (no JWT stateless) — a propósito, para que un
+// Admin pueda revocar el acceso de un usuario al instante desde
+// Configuración → Usuarios (clave para un call center con personal
+// rotativo): borrar esta fila (o desactivar al usuario) invalida la sesión
+// de inmediato, sin esperar a que expire un token firmado.
+model Session {
+  id        String   @id // token opaco (no es un JWT, solo una clave de búsqueda)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+
+  @@index([userId])
+}
+
+// Fichaje / cronómetro personal ("En el trabajo") — cada fila es una jornada:
+// se abre al marcar "Iniciar", se puede pausar/reanudar (el tiempo en pausa
+// no cuenta como trabajado) y se cierra al marcar "Finalizar". Por ahora es
+// solo el cronómetro individual visible en el menú del usuario — reportes de
+// asistencia para Admin quedan para una fase de Reportes más adelante.
+model TimeEntry {
+  id                 String          @id @default(cuid())
+  userId             String
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clockIn            DateTime        @default(now())
+  clockOut           DateTime?
+  status             TimeEntryStatus @default(WORKING)
+  pausedAt           DateTime?       // inicio de la pausa actual, null si no está en pausa
+  totalPausedSeconds Int             @default(0) // acumulado de pausas ya cerradas en esta jornada
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([userId, status])
+}
+
+enum TimeEntryStatus {
+  WORKING
+  PAUSED
+  FINISHED
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  name        String       @unique // Super Admin, Admin, Manager, Agent, Viewer
+  description String?
+  isSystem    Boolean      @default(false) // roles base no eliminables
+  users       User[]
+  permissions RolePermission[]
+  createdAt   DateTime     @default(now())
+}
+
+model Permission {
+  id       String @id @default(cuid())
+  resource String // "leads", "commissions", "sensitive_data", ...
+  action   String // "view", "create", "edit", "delete", "export"
+  roles    RolePermission[]
+
+  @@unique([resource, action])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+// ---------------------------------------------------------------------------
+// 2. AGENTES / VENDEDORES / AOR
+// ---------------------------------------------------------------------------
+// Un Agent puede actuar como vendedor, como AOR, o ambos — se modela con
+// flags en lugar de tablas separadas para no duplicar personas.
+
+model Agent {
+  id           String   @id @default(cuid())
+  firstName    String
+  lastName     String
+  npn          String?  @unique // National Producer Number
+  email        String?
+  phone        String?
+  isSeller     Boolean  @default(true)
+  isAor        Boolean  @default(false)
+  status       AgentStatus @default(ACTIVE)
+  user         User?
+  createdAt    DateTime @default(now())
+
+  leadsAsAgent     Lead[]     @relation("LeadAgent")
+  leadsAsAor       Lead[]     @relation("LeadAor")
+  clientsAsAgent   Client[]   @relation("ClientAgent")
+  clientsAsAor     Client[]   @relation("ClientAor")
+  policiesAsAgent  Policy[]   @relation("PolicyAgent")
+  policiesAsAor    Policy[]   @relation("PolicyAor")
+  sales            Sale[]
+  commissionRates  CommissionRate[]
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// ---------------------------------------------------------------------------
+// 3. CATÁLOGOS CONFIGURABLES
+// ---------------------------------------------------------------------------
+
+model LeadSource {
+  id    String @id @default(cuid())
+  name  String @unique // Base de datos, Referido, Evento, Llamada entrante, Otro
+  leads Lead[]
+}
+
+model InsuranceLine {
+  id          String   @id @default(cuid())
+  name        String   @unique // Medicare Advantage, Obamacare, Family Heritage, Vida...
+  code        String   @unique // MEDICARE, OBAMACARE, FAMILY_HERITAGE, VIDA...
+  isActive    Boolean  @default(true)
+  carriers    CarrierInsuranceLine[]
+  policies    Policy[]
+  sales       Sale[]
+  rates       CommissionRate[]
+  customFields CustomField[] @relation("LineCustomFields")
+  leadsInterested Lead[] @relation("LeadInterestedLine")
+}
+
+model Carrier {
+  id       String   @id @default(cuid())
+  name     String   @unique
+  status   CarrierStatus @default(ACTIVE)
+  lines    CarrierInsuranceLine[]
+  policies Policy[]
+  sales    Sale[]
+}
+
+enum CarrierStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model CarrierInsuranceLine {
+  carrierId       String
+  insuranceLineId String
+  carrier         Carrier       @relation(fields: [carrierId], references: [id])
+  insuranceLine   InsuranceLine @relation(fields: [insuranceLineId], references: [id])
+
+  @@id([carrierId, insuranceLineId])
+}
+
+// ---------------------------------------------------------------------------
+// 4. PIPELINES Y ETAPAS (configurable, aplica a Lead y a Sale)
+// ---------------------------------------------------------------------------
+
+model Pipeline {
+  id         String          @id @default(cuid())
+  name       String
+  entityType PipelineEntity  // LEAD | SALE
+  isDefault  Boolean         @default(false)
+  stages     PipelineStage[]
+  leads      Lead[]
+  sales      Sale[]
+}
+
+enum PipelineEntity {
+  LEAD
+  SALE
+}
+
+model PipelineStage {
+  id         String   @id @default(cuid())
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
+  name       String
+  order      Int
+  isWon      Boolean  @default(false)
+  isLost     Boolean  @default(false)
+  leads      Lead[]
+  sales      Sale[]
+
+  @@unique([pipelineId, order])
+}
+
+// Historial de cambio de etapa — aplica tanto a Lead como a Sale (polimórfico)
+model PipelineHistory {
+  id           String     @id @default(cuid())
+  entityType   PipelineEntity
+  entityId     String
+  fromStageId  String?
+  toStageId    String
+  changedById  String
+  changedAt    DateTime   @default(now())
+
+  @@index([entityType, entityId])
+}
+
+// ---------------------------------------------------------------------------
+// 5. LEADS
+// ---------------------------------------------------------------------------
+
+model Lead {
+  id              String        @id @default(cuid())
+  firstName       String
+  lastName        String
+  dob             DateTime?
+  phone           String?
+  email           String?
+  address         String?
+  zipCode         String?
+  county          String?
+  state           String?
+  preferredLanguage String?
+  sourceId        String?
+  source          LeadSource?   @relation(fields: [sourceId], references: [id])
+  // Línea de negocio de interés — señal comercial temprana, antes de que
+  // exista una Policy real. Es una FK al catálogo InsuranceLine (nunca un
+  // enum fijo), así una línea nueva agregada desde Configuración aparece
+  // aquí también sin tocar este modelo.
+  interestedLineId String?
+  interestedLine   InsuranceLine? @relation("LeadInterestedLine", fields: [interestedLineId], references: [id])
+  agentId         String?
+  agent           Agent?        @relation("LeadAgent", fields: [agentId], references: [id])
+  aorId           String?
+  aor             Agent?        @relation("LeadAor", fields: [aorId], references: [id])
+  pipelineId      String
+  pipeline        Pipeline      @relation(fields: [pipelineId], references: [id])
+  stageId         String
+  stage           PipelineStage @relation(fields: [stageId], references: [id])
+  lastContactAt   DateTime?
+  nextFollowUpAt  DateTime?
+  convertedAt     DateTime?
+  convertedClientId String?     @unique
+  convertedClient Client?       @relation(fields: [convertedClientId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  activities   Activity[]
+  tasks        Task[]
+  appointments Appointment[]
+  documents    Document[]
+  notes        Note[]
+  sales        Sale[]
+  customFieldValues CustomFieldValue[]
+
+  @@index([stageId])
+  @@index([agentId])
+}
+
+// ---------------------------------------------------------------------------
+// 6. CLIENTES
+// ---------------------------------------------------------------------------
+
+model Client {
+  id                String   @id @default(cuid())
+  originLead        Lead?
+  firstName         String
+  lastName          String
+  dob               DateTime?
+  phone             String?
+  email             String?
+  address           String?
+  zipCode           String?
+  county            String?
+  state             String?
+  preferredLanguage String?
+  sourceId          String?
+  agentId           String?
+  agent             Agent?   @relation("ClientAgent", fields: [agentId], references: [id])
+  aorId             String?
+  aor               Agent?   @relation("ClientAor", fields: [aorId], references: [id])
+  createdAt         DateTime @default(now()) // "cliente desde"
+  updatedAt         DateTime @updatedAt
+
+  policies          Policy[]
+  sales             Sale[]
+  activities        Activity[]
+  tasks             Task[]
+  appointments      Appointment[]
+  documents         Document[]
+  notes             Note[]
+  customFieldValues CustomFieldValue[]
+
+  medicareProfile       MedicareProfile?
+  obamacareProfile      ObamacareProfile?
+  familyHeritageProfile FamilyHeritageProfile?
+
+  sensitiveFields   SensitiveField[]
+}
+
+// ---------------------------------------------------------------------------
+// 7. DATOS SENSIBLES (genérico, con auditoría de acceso)
+// ---------------------------------------------------------------------------
+// En vez de columnas de texto plano (SSN, cuentas bancarias) regadas por todo
+// el schema, se centralizan aquí: valor cifrado a nivel de aplicación +
+// máscara para mostrar en UI + registro de quién accede a los datos reales.
+
+model SensitiveField {
+  id            String   @id @default(cuid())
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id])
+  fieldKey      String   // "ssn", "bank_account_number", "routing_number"...
+  encryptedValue String  // cifrado en reposo (AES-256), nunca texto plano
+  maskedPreview String   // ej. "***-**-1234", se puede mostrar sin permiso especial
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  accessLogs SensitiveDataAccessLog[]
+
+  @@unique([clientId, fieldKey])
+}
+
+model SensitiveDataAccessLog {
+  id               String         @id @default(cuid())
+  sensitiveFieldId String
+  sensitiveField   SensitiveField @relation(fields: [sensitiveFieldId], references: [id])
+  userId           String
+  user             User           @relation(fields: [userId], references: [id])
+  reason           String?
+  accessedAt       DateTime       @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// 8. PERFILES POR LÍNEA DE NEGOCIO (1:1 con Client)
+// ---------------------------------------------------------------------------
+
+model MedicareProfile {
+  id                    String   @id @default(cuid())
+  clientId              String   @unique
+  client                Client   @relation(fields: [clientId], references: [id])
+
+  medicareNumberRef     String?  // referencia a SensitiveField.id (SSN-like)
+  hasMedicaid           Boolean  @default(false)
+  medicaidNumberRef     String?
+  dualClassification    String?
+  qmb                   Boolean  @default(false)
+  fbde                  Boolean  @default(false)
+  slmb                  Boolean  @default(false)
+  extraHelp             Boolean  @default(false)
+
+  healthRating          Int?     // 1-10
+  weight                Float?
+  height                Float?
+  homeAttendant         Boolean  @default(false)
+  homeAttendantCompany  String?
+  hasCancer             Boolean  @default(false)
+  onDialysis            Boolean  @default(false)
+
+  primaryDoctorName     String?
+  primaryDoctorAddress  String?
+  primaryDoctorPhone    String?
+  preferredPharmacy     String?
+
+  currentCarrierId      String?
+  currentPlanName       String?
+  currentPlanType       PlanType?
+  offeredCarrierId      String?
+  offeredPlanName       String?
+  offeredPlanType       PlanType?
+  changeReason          String?
+  electionPeriod        String?
+  presentationMethod    PresentationMethod?
+
+  soaSigned             Boolean  @default(false)
+  soaDate               DateTime?
+  soaMethod             String?
+  callRecordingUrl      String?
+
+  effectiveDate         DateTime?
+  confirmationNumber    String?
+
+  poa                   Boolean  @default(false)
+  poaFirstName          String?
+  poaLastName           String?
+  poaAddress            String?
+  poaPhone              String?
+  poaRelationship       String?
+
+  currentAor            Boolean  @default(false)
+  currentAorName        String?
+  acceptsAgentChange    Boolean  @default(false)
+  acceptsPlanChange     Boolean  @default(false)
+  signatureUrl          String?
+
+  conditions   MedicareCondition[]
+  medications  MedicareMedication[]
+  specialists  MedicareSpecialist[]
+}
+
+enum PlanType {
+  HMO
+  PPO
+  D_SNP
+  C_SNP
+}
+
+enum PresentationMethod {
+  PHONE
+  IN_PERSON
+  VIRTUAL
+}
+
+model MedicareCondition {
+  id                String          @id @default(cuid())
+  medicareProfileId String
+  profile           MedicareProfile @relation(fields: [medicareProfileId], references: [id])
+  name              String
+  isChronic         Boolean         @default(false)
+}
+
+model MedicareMedication {
+  id                String          @id @default(cuid())
+  medicareProfileId String
+  profile           MedicareProfile @relation(fields: [medicareProfileId], references: [id])
+  name              String
+  mg                String?
+  frequency         String?
+}
+
+model MedicareSpecialist {
+  id                String          @id @default(cuid())
+  medicareProfileId String
+  profile           MedicareProfile @relation(fields: [medicareProfileId], references: [id])
+  name              String
+  address           String?
+  phone             String?
+  nextAppointmentAt DateTime?
+}
+
+model ObamacareProfile {
+  id                      String   @id @default(cuid())
+  clientId                String   @unique
+  client                  Client   @relation(fields: [clientId], references: [id])
+
+  age                     Int?
+  householdIncomeRef      String?  // referencia a SensitiveField (financiero)
+  householdSize           Int?
+  immigrationStatusRef    String?  // referencia a SensitiveField (restringido)
+  maritalStatus           String?
+  hasSpouse               Boolean  @default(false)
+  filesJointTaxes         Boolean  @default(false)
+  hasEmployerCoverage     Boolean  @default(false)
+
+  period                  String?
+  carrierId               String?
+  planName                String?
+  planType                ObamacarePlanType?
+  monthlyPremium          Float?
+  marketplaceApplicationId String?
+  marketplaceConsent      Boolean  @default(false)
+  consentDate             DateTime?
+  effectiveDate           DateTime?
+
+  dependents Dependent[]
+}
+
+enum ObamacarePlanType {
+  BRONZE
+  SILVER
+  GOLD
+}
+
+model Dependent {
+  id                 String           @id @default(cuid())
+  obamacareProfileId String
+  profile            ObamacareProfile @relation(fields: [obamacareProfileId], references: [id])
+  firstName          String
+  lastName           String
+  dob                DateTime?
+  ssnRef             String?          // referencia a SensitiveField
+}
+
+model FamilyHeritageProfile {
+  id             String   @id @default(cuid())
+  clientId       String   @unique
+  client         Client   @relation(fields: [clientId], references: [id])
+
+  planType       FamilyHeritagePlan?
+  coverageType   FamilyHeritageCoverage?
+  issueAge       Int?
+  rop            Boolean  @default(false)
+  monthlyPremium Float?
+  policyNumber   String?
+  effectiveDate  DateTime?
+
+  bankNameRef       String? // referencia a SensitiveField
+  accountHolderRef  String?
+  accountCityRef    String?
+  routingNumberRef  String?
+  accountNumberRef  String?
+  debitDayOfMonth   Int?
+
+  coveredMembers CoveredMember[]
+}
+
+enum FamilyHeritagePlan {
+  ELITE_8
+  PREFERRED_4
+  STANDARD_2
+}
+
+enum FamilyHeritageCoverage {
+  INDIVIDUAL
+  COUPLE
+  SINGLE_PARENT
+  FAMILY
+}
+
+model CoveredMember {
+  id                String                 @id @default(cuid())
+  profileId         String
+  profile           FamilyHeritageProfile  @relation(fields: [profileId], references: [id])
+  firstName         String
+  lastName          String
+  dob               DateTime?
+  relationship      String?
+  ssnRef            String?                // referencia a SensitiveField
+}
+
+// ---------------------------------------------------------------------------
+// 9. PÓLIZAS
+// ---------------------------------------------------------------------------
+
+model Policy {
+  id              String        @id @default(cuid())
+  policyNumber    String?       @unique
+  clientId        String
+  client          Client        @relation(fields: [clientId], references: [id])
+  insuranceLineId String
+  insuranceLine   InsuranceLine @relation(fields: [insuranceLineId], references: [id])
+  carrierId       String
+  carrier         Carrier       @relation(fields: [carrierId], references: [id])
+  planName        String?
+  premium         Float?
+  saleDate        DateTime?
+  effectiveDate   DateTime?
+  status          PolicyStatus  @default(QUOTE)
+  agentId         String?
+  agent           Agent?        @relation("PolicyAgent", fields: [agentId], references: [id])
+  aorId           String?
+  aor             Agent?        @relation("PolicyAor", fields: [aorId], references: [id])
+  saleId          String?       @unique
+  sale            Sale?         @relation(fields: [saleId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  documents   Document[]
+  notes       Note[]
+  commission  Commission?
+  customFieldValues CustomFieldValue[]
+
+  @@index([clientId])
+  @@index([status])
+}
+
+enum PolicyStatus {
+  QUOTE
+  APPLICATION
+  PENDING
+  APPROVED
+  ACTIVE
+  CANCELLED
+  REJECTED
+  CHARGEBACK
+}
+
+// ---------------------------------------------------------------------------
+// 10. VENTAS (Sales Pipeline)
+// ---------------------------------------------------------------------------
+
+model Sale {
+  id                 String        @id @default(cuid())
+  clientId           String?
+  client             Client?       @relation(fields: [clientId], references: [id])
+  leadId             String?
+  lead               Lead?         @relation(fields: [leadId], references: [id])
+  agentId            String?
+  agent              Agent?        @relation(fields: [agentId], references: [id])
+  insuranceLineId    String?
+  insuranceLine      InsuranceLine? @relation(fields: [insuranceLineId], references: [id])
+  carrierId          String?
+  carrier            Carrier?      @relation(fields: [carrierId], references: [id])
+  planName           String?
+  premium            Float?
+  saleDate           DateTime      @default(now())
+  effectiveDate      DateTime?
+  method             SaleMethod?
+  pipelineId         String
+  pipeline           Pipeline      @relation(fields: [pipelineId], references: [id])
+  stageId            String
+  stage              PipelineStage @relation(fields: [stageId], references: [id])
+  expectedCommission Float?
+  receivedCommission Float?
+  margin             Float?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  policy      Policy?
+  documents   Document[]
+  activities  Activity[]
+  customFieldValues CustomFieldValue[]
+
+  @@index([stageId])
+}
+
+enum SaleMethod {
+  PHONE
+  IN_PERSON
+  VIRTUAL
+  ONLINE
+}
+
+// ---------------------------------------------------------------------------
+// 11. COMPENSACIONES Y TARIFAS
+// ---------------------------------------------------------------------------
+
+model CommissionRate {
+  id                String        @id @default(cuid())
+  insuranceLineId   String
+  insuranceLine     InsuranceLine @relation(fields: [insuranceLineId], references: [id])
+  agentId           String?       // null = tarifa base de la línea
+  agent             Agent?        @relation(fields: [agentId], references: [id])
+  agentAmountOrPct  Float         // monto fijo o % según agentAmountType
+  agentAmountType   AmountType    @default(FIXED)
+  managerPct        Float?
+  aorAmount         Float?
+  effectiveFrom     DateTime      @default(now())
+  effectiveTo       DateTime?
+}
+
+enum AmountType {
+  FIXED
+  PERCENTAGE
+}
+
+model Commission {
+  id                   String   @id @default(cuid())
+  policyId             String   @unique
+  policy               Policy   @relation(fields: [policyId], references: [id])
+  agentAmount          Float?
+  managerAmount        Float?
+  aorAmount            Float?
+  totalAcquisitionCost Float?
+  carrierCommission    Float?
+  margin               Float?
+  agentPaymentDate     DateTime?
+  carrierPaymentDate   DateTime?
+  status               CommissionStatus @default(PENDING)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+enum CommissionStatus {
+  PENDING
+  PAID
+  CHARGEBACK
+}
+
+// ---------------------------------------------------------------------------
+// 12. ACTIVIDADES, TAREAS, CITAS, NOTAS, DOCUMENTOS
+// ---------------------------------------------------------------------------
+
+model Activity {
+  id         String       @id @default(cuid())
+  type       ActivityType
+  result     String?
+  notes      String?
+  occurredAt DateTime     @default(now())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id])
+
+  leadId   String?
+  lead     Lead?  @relation(fields: [leadId], references: [id])
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+  saleId   String?
+  sale     Sale?   @relation(fields: [saleId], references: [id])
+
+  @@index([leadId])
+  @@index([clientId])
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  SMS
+  WHATSAPP
+  MEETING
+  APPOINTMENT
+  NOTE
+  FOLLOW_UP
+  DOCUMENT
+  OTHER
+}
+
+// Reportes diarios — resumen general de la jornada que cada usuario
+// registra al terminar el día (sección "Actividades" del sidebar, distinto
+// del log granular de Activity de arriba: llamadas/citas/etc. siguen
+// registrándose donde ya se registraban, esto es un resumen de texto
+// libre). Una vez creado queda de solo lectura para su autor — el único
+// cambio posterior permitido es la revisión de un supervisor/admin
+// (status + reviewedBy/reviewedAt/reviewComment), nunca una edición del
+// contenido original.
+model DailyReport {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation("DailyReportAuthor", fields: [userId], references: [id])
+  content String
+
+  status DailyReportStatus @default(PENDING)
+
+  reviewedById  String?
+  reviewedBy    User?     @relation("DailyReportReviewer", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+  reviewComment String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum DailyReportStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  assignedToId String
+  assignedTo  User         @relation(fields: [assignedToId], references: [id])
+  leadId      String?
+  lead        Lead?        @relation(fields: [leadId], references: [id])
+  clientId    String?
+  client      Client?      @relation(fields: [clientId], references: [id])
+  dueDate     DateTime?
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(PENDING)
+  createdAt   DateTime     @default(now())
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Appointment {
+  id        String            @id @default(cuid())
+  title     String
+  userId    String
+  user      User              @relation(fields: [userId], references: [id])
+  leadId    String?
+  lead      Lead?             @relation(fields: [leadId], references: [id])
+  clientId  String?
+  client    Client?           @relation(fields: [clientId], references: [id])
+  startsAt  DateTime
+  durationMinutes Int         @default(30)
+  type      AppointmentType   @default(MEETING)
+  notes     String?
+  status    AppointmentStatus @default(SCHEDULED)
+}
+
+enum AppointmentType {
+  CALL
+  MEETING
+  FOLLOW_UP
+  OTHER
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id])
+  clientId  String?
+  client    Client?  @relation(fields: [clientId], references: [id])
+  policyId  String?
+  policy    Policy?  @relation(fields: [policyId], references: [id])
+}
+
+model Document {
+  id           String   @id @default(cuid())
+  fileName     String
+  fileUrl      String
+  category     String?
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  uploadedAt   DateTime @default(now())
+
+  leadId   String?
+  lead     Lead?   @relation(fields: [leadId], references: [id])
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+  saleId   String?
+  sale     Sale?   @relation(fields: [saleId], references: [id])
+  policyId String?
+  policy   Policy? @relation(fields: [policyId], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// 13. CAMPOS PERSONALIZADOS (EAV configurable)
+// ---------------------------------------------------------------------------
+
+model CustomField {
+  id           String          @id @default(cuid())
+  entityType   CustomFieldEntity
+  name         String          // clave interna
+  label        String          // etiqueta visible
+  fieldType    CustomFieldType
+  isRequired   Boolean         @default(false)
+  isVisible    Boolean         @default(true)
+  defaultValue String?
+  options      Json?           // para select / multi-select
+  order        Int             @default(0)
+  section      String?
+  insuranceLineId String?
+  insuranceLine   InsuranceLine? @relation("LineCustomFields", fields: [insuranceLineId], references: [id])
+
+  values CustomFieldValue[]
+
+  @@unique([entityType, name])
+}
+
+enum CustomFieldEntity {
+  LEAD
+  CLIENT
+  POLICY
+  SALE
+  DEPENDENT
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DECIMAL
+  DATE
+  DATETIME
+  BOOLEAN
+  SELECT
+  MULTISELECT
+  EMAIL
+  PHONE
+  URL
+  TEXTAREA
+  FILE
+}
+
+model CustomFieldValue {
+  id            String      @id @default(cuid())
+  customFieldId String
+  customField   CustomField @relation(fields: [customFieldId], references: [id])
+  value         String?
+
+  leadId   String?
+  lead     Lead?   @relation(fields: [leadId], references: [id])
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+  policyId String?
+  policy   Policy? @relation(fields: [policyId], references: [id])
+  saleId   String?
+  sale     Sale?   @relation(fields: [saleId], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// 14. NOTIFICACIONES Y AUDITORÍA
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  type             String   // task_overdue, upcoming_appointment, turning_65, ...
+  title            String
+  message          String
+  relatedEntityType String?
+  relatedEntityId  String?
+  isRead           Boolean  @default(false)
+  createdAt        DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     AuditAction
+  entityType String
+  entityId   String
+  fieldName  String?
+  oldValue   String?
+  newValue   String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  STAGE_CHANGE
+  AGENT_CHANGE
+  SENSITIVE_ACCESS
+  POLICY_CHANGE
+  COMMISSION_CHANGE
+}
+
+// ---------------------------------------------------------------------------
+// 11. RECONOCIMIENTOS — sección "Perfil de usuario"
+// ---------------------------------------------------------------------------
+// Insignias que un usuario le envía a otro (o el sistema le da de
+// bienvenida — ver prisma/seed.ts). Modelo intencionalmente simple: el tipo
+// determina el ícono/color/etiqueta en el frontend (ver
+// src/components/profile/recognitionTypes.ts), así que agregar un tipo nuevo
+// no requiere migración, solo un valor de enum + una entrada en ese catálogo.
+model Recognition {
+  id     String          @id @default(cuid())
+  type   RecognitionType
+  note   String?
+  createdAt DateTime     @default(now())
+
+  toUserId   String
+  toUser     User   @relation("RecognitionTo", fields: [toUserId], references: [id])
+  fromUserId String
+  fromUser   User   @relation("RecognitionFrom", fields: [fromUserId], references: [id])
+
+  @@index([toUserId])
+}
+
+enum RecognitionType {
+  PERFORMANCE
+  LEADERSHIP
+  EXCELLENCE
+  GOALS
+  TEAMWORK
+  MENTOR
+  MILESTONE
+  GRATITUDE
+}
+
+// ---------------------------------------------------------------------------
+// 12. MENSAJERÍA INTERNA — chat 1:1 entre usuarios de KOSMO
+// ---------------------------------------------------------------------------
+// Reemplaza el shell de UI con datos ficticios de Fase 1 (src/data/messenger.ts)
+// — ahora las conversaciones y mensajes son filas reales, compartidas entre
+// todos los usuarios de la plataforma. Sigue siendo 1:1 por ahora (sin chats
+// grupales); "todos con todos" — cualquier usuario ACTIVE puede escribirle a
+// cualquier otro, sin restricción de jerarquía.
+//
+// userAId/userBId se guardan siempre normalizados (el id menor en userAId)
+// para que el índice único detecte el par sin importar quién inició el chat
+// — ver findOrCreateConversation() en app/(app)/messages/actions.ts.
+model Conversation {
+  id        String   @id @default(cuid())
+  userAId   String
+  userA     User     @relation("ConversationUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId   String
+  userB     User     @relation("ConversationUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  messages Message[]
+  reads    ConversationRead[]
+
+  @@unique([userAId, userBId])
+  @@index([userBId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation("MessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  text           String?
+  sticker        String?
+  // Foto adjunta embebida como data URL, igual que avatarUrl/coverPhotoUrl de
+  // User — sin proveedor de almacenamiento de archivos propio todavía.
+  imageUrl       String?
+  imageName      String?
+  sentAt         DateTime     @default(now())
+  // Fase de mensajería — menú contextual estilo Bitrix24 (editar/eliminar/fijar).
+  // Editar: solo el remitente, solo el texto (no aplica a stickers). null = nunca editado.
+  editedAt       DateTime?
+  // Eliminar es un borrado lógico — el texto/imagen dejan de mostrarse ("Mensaje
+  // eliminado") pero la fila se conserva. null = no eliminado.
+  deletedAt      DateTime?
+  // Fijado — un solo mensaje fijado a la vez por conversación (ver
+  // togglePinMessageAction, que desfija cualquier otro al fijar uno nuevo).
+  pinned         Boolean      @default(false)
+  pinnedAt       DateTime?
+
+  @@index([conversationId, sentAt])
+  @@index([conversationId, pinned])
+}
+
+// Marca de "leído hasta" por usuario y conversación — reemplaza al viejo
+// estado por-mensaje simulado (SENT → DELIVERED → READ con setTimeout). Un
+// mensaje se pinta como leído cuando su sentAt <= lastReadAt del otro
+// participante.
+model ConversationRead {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation("ConversationReads", fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+}
+
+// ---------------------------------------------------------------------------
+// 15. CORREO INTERNO — mensajería corporativa privada (usuario@<dominio interno>)
+// ---------------------------------------------------------------------------
+// Correo asíncrono (Para/CC/Asunto/Cuerpo/Adjuntos/Carpetas) 100% privado —
+// deliberadamente SEPARADO de la Mensajería interna de la sección 12 (chat
+// 1:1 en vivo tipo WhatsApp): acá el modelo es Outlook/Gmail cerrado a la
+// organización, no chat en tiempo real.
+//
+// Reglas de diseño que este bloque encierra (ver brief del usuario):
+// - NUNCA se conecta a internet público: no hay SMTP saliente/entrante, no
+//   hay envío a Gmail/Outlook/Yahoo. Un InternalMessageRecipient solo puede
+//   apuntar a un InternalMailbox que ya existe en esta base de datos — el
+//   propio tipo del modelo hace estructuralmente imposible el envío externo,
+//   no es solo una validación en el formulario.
+// - El dominio (ej. "alliance.internal") es una variable de entorno
+//   (INTERNAL_EMAIL_DOMAIN, ver src/lib/mail/config.ts), no una columna en
+//   cada fila — así se puede migrar a un dominio real después sin tocar
+//   millones de direcciones ya emitidas. Cada buzón sí guarda
+//   `domainAtCreation` para reconstruir la dirección con la que se creó.
+// - user_id (nunca el email) es la llave primaria de identidad — igual que
+//   el resto del CRM: InternalMailbox.userId es único y es lo que enlaza
+//   todo lo demás.
+// - Cada destinatario tiene su PROPIA copia del mensaje
+//   (InternalMessageRecipient) en su propia carpeta — así archivar/leer/
+//   borrar el correo de una persona nunca afecta la copia de otra, incluida
+//   la del remitente (su copia en "Enviados" es una fila con role=FROM).
+// - Papelera y retención son borrado LÓGICO (isDeleted) — nunca se borra la
+//   fila físicamente salvo por el job de retención (ver MailSettings.
+//   retentionPolicy) o una eliminación explícita desde la Papelera.
+// - MailAuditLog es de solo-anexado desde la aplicación: ninguna acción de
+//   servidor expuesta a usuarios normales actualiza ni borra estas filas.
+
+model InternalMailbox {
+  id               String        @id @default(cuid())
+  userId           String        @unique
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Dirección = `${localPart}@${domainAtCreation}` — nunca se recalcula con
+  // el dominio "actual" para una fila ya emitida (ver nota de la sección).
+  localPart        String
+  domainAtCreation String
+  status           MailboxStatus @default(ACTIVE)
+  createdAt        DateTime      @default(now())
+  disabledAt       DateTime?
+
+  folders      MailFolder[]
+  recipients   InternalMessageRecipient[]
+  sentMessages InternalMessage[]          @relation("MailSender")
+  auditLogs    MailAuditLog[]
+
+  @@unique([localPart, domainAtCreation])
+}
+
+enum MailboxStatus {
+  ACTIVE
+  // Usuario desactivado/eliminado — el buzón NO se borra ni se libera la
+  // dirección de inmediato (retención + evita reasignar la misma dirección
+  // a otra persona por error), ver deleteUserAction / setUserStatusAction.
+  DISABLED
+  ARCHIVED
+}
+
+model MailFolder {
+  id        String         @id @default(cuid())
+  mailboxId String
+  mailbox   InternalMailbox @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+  type      MailFolderType
+  // Etiqueta visible — para carpetas de sistema la fija el catálogo del
+  // frontend (src/lib/mail/folders.ts) al crearlas; editable solo si
+  // type = CUSTOM (futuras carpetas propias del usuario).
+  name      String
+  isSystem  Boolean        @default(true)
+  order     Int            @default(0)
+  createdAt DateTime       @default(now())
+
+  recipients InternalMessageRecipient[]
+
+  @@unique([mailboxId, type, name])
+  @@index([mailboxId])
+}
+
+enum MailFolderType {
+  INBOX
+  SENT
+  DRAFTS
+  ARCHIVE
+  TRASH
+  CUSTOM
+}
+
+model InternalMessage {
+  id        String          @id @default(cuid())
+  senderId  String
+  sender    InternalMailbox @relation("MailSender", fields: [senderId], references: [id])
+  subject   String
+  body      String          @db.Text
+  isDraft   Boolean         @default(false)
+  // Direcciones tal como se escribieron en el compositor MIENTRAS el mensaje
+  // es borrador — todavía no se resolvieron a filas InternalMessageRecipient
+  // reales (eso solo pasa al enviar, cuando cada destinatario ya se validó
+  // como interno y activo). Se conservan también después de enviado, como
+  // registro legible de a quién se escribió sin tener que unir recipients.
+  draftToAddresses String[]   @default([])
+  draftCcAddresses String[]   @default([])
+  sentAt    DateTime?
+  createdAt DateTime        @default(now())
+
+  recipients  InternalMessageRecipient[]
+  attachments InternalAttachment[]
+
+  @@index([senderId, createdAt])
+}
+
+model InternalMessageRecipient {
+  id            String          @id @default(cuid())
+  messageId     String
+  message       InternalMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  mailboxId     String
+  mailbox       InternalMailbox @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+  folderId      String
+  folder        MailFolder      @relation(fields: [folderId], references: [id])
+  recipientRole MailRecipientRole
+  isRead        Boolean         @default(false)
+  readAt        DateTime?
+  // Papelera lógica — ver nota de la sección.
+  isDeleted     Boolean         @default(false)
+  deletedAt     DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@index([mailboxId, folderId])
+  @@index([messageId])
+}
+
+enum MailRecipientRole {
+  TO
+  CC
+  // Copia del propio remitente en su carpeta "Enviados".
+  FROM
+}
+
+model InternalAttachment {
+  id        String          @id @default(cuid())
+  messageId String
+  message   InternalMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  // Mismo patrón que Message.imageUrl / User.avatarUrl — base64 embebido
+  // directo en Postgres, único almacenamiento de archivos que existe hoy en
+  // este CRM (no hay proveedor de object storage contratado).
+  dataUrl    String          @db.Text
+  uploadedAt DateTime        @default(now())
+
+  @@index([messageId])
+}
+
+// Auditoría DEDICADA de correo — separada de AuditLog (sección 14) porque el
+// brief exige ip/userAgent (AuditLog no los tiene) y exige que sea de
+// solo-anexado, nunca modificable por un usuario normal.
+model MailAuditLog {
+  id           String          @id @default(cuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id])
+  mailboxId    String?
+  mailbox      InternalMailbox? @relation(fields: [mailboxId], references: [id])
+  action       MailAuditAction
+  messageId    String?
+  attachmentId String?
+  ipAddress    String?
+  userAgent    String?
+  // Contexto adicional sin esquema fijo — ej. { reason, targetMailboxId }
+  // para un ADMIN_ACCESS_GRANTED (acceso excepcional de un admin al buzón de
+  // otro usuario, siempre con motivo registrado, nunca automático).
+  metadata     Json?
+  createdAt    DateTime        @default(now())
+
+  @@index([userId, createdAt])
+  @@index([mailboxId, createdAt])
+}
+
+enum MailAuditAction {
+  MESSAGE_CREATED
+  MESSAGE_SENT
+  MESSAGE_READ
+  MESSAGE_DELETED
+  MESSAGE_ARCHIVED
+  ATTACHMENT_UPLOADED
+  ATTACHMENT_DOWNLOADED
+  ATTACHMENT_DELETED
+  MAILBOX_ACCESSED
+  EXTERNAL_RECIPIENT_BLOCKED
+  // Acceso excepcional de un Admin al buzón de otro usuario — siempre con
+  // `metadata.reason`, nunca implícito por el rol (ver brief: "ni siquiera
+  // los administradores deberían tener acceso automático").
+  ADMIN_ACCESS_GRANTED
+}
+
+// Configuración global del módulo, editable en caliente desde Configuración →
+// Comunicación → Correo interno, sin redeploy. El dominio real sigue viviendo
+// en la variable de entorno INTERNAL_EMAIL_DOMAIN (fuente de verdad para
+// generar direcciones nuevas) — esta fila es lo que un Admin puede ajustar:
+// activar/desactivar el módulo entero y los límites de adjuntos/retención.
+model MailSettings {
+  id                  String              @id @default("singleton")
+  isEnabled           Boolean             @default(true)
+  maxAttachmentSizeMb Int                 @default(10)
+  allowedExtensions   String[]            @default(["pdf", "png", "jpg", "jpeg", "docx", "xlsx"])
+  retentionPolicy     MailRetentionPolicy @default(INDEFINITE)
+  updatedAt           DateTime            @updatedAt
+}
+
+enum MailRetentionPolicy {
+  DAYS_30
+  DAYS_90
+  YEAR_1
+  INDEFINITE
+}

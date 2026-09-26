@@ -1,0 +1,302 @@
+import Link from "next/link";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Badge, statusToBadgeVariant } from "@/components/ui/Badge";
+import { Tabs } from "@/components/ui/Tabs";
+import { Table, THead, TBody, Tr, Th, Td } from "@/components/ui/Table";
+import { SensitiveDataPanel } from "@/components/clients/SensitiveDataPanel";
+import { MedicareProfileTab } from "@/components/clients/MedicareProfileTab";
+import { ObamacareProfileTab } from "@/components/clients/ObamacareProfileTab";
+import { FamilyHeritageProfileTab } from "@/components/clients/FamilyHeritageProfileTab";
+import { Info } from "@/components/clients/Info";
+import { requireUser, hasPermission } from "@/lib/auth";
+import { getClientForUser } from "../data";
+import { getMedicareProfileForClient, getMedicareFormOptions } from "./medicare/data";
+import { getObamacareProfileForClient, getObamacareFormOptions } from "./obamacare/data";
+import { getFamilyHeritageProfileForClient } from "./family-heritage/data";
+import { formatCurrency, formatDate, timeSince, calculateAge } from "@/lib/utils";
+import { notFound } from "next/navigation";
+import { ArrowLeftCircle, ClipboardList, ShieldCheck } from "lucide-react";
+
+export const dynamic = "force-dynamic";
+
+export default async function ClientDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const user = await requireUser();
+  const client = await getClientForUser(id, user);
+  if (!client) return notFound();
+
+  const canEditClient = hasPermission(user, "clients", "edit");
+  const [medicareProfile, medicareOptions, obamacareProfile, obamacareOptions, familyHeritageProfile] =
+    await Promise.all([
+      getMedicareProfileForClient(id, user),
+      getMedicareFormOptions(),
+      getObamacareProfileForClient(id, user),
+      getObamacareFormOptions(),
+      getFamilyHeritageProfileForClient(id, user),
+    ]);
+
+  const policies = client.policies ?? [];
+  const totalCommissions = policies.reduce((sum, p) => sum + (p.commission?.agentAmount ?? 0), 0);
+
+  return (
+    <div>
+      <PageHeader
+        title={`${client.firstName} ${client.lastName}`}
+        description={`Cliente desde ${formatDate(client.createdAt)} (${timeSince(client.createdAt)} en cartera)`}
+        actions={
+          client.originLeadId ? (
+            <Link href={`/leads/${client.originLeadId}`}>
+              <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 text-sm text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)]">
+                <ArrowLeftCircle className="h-4 w-4" /> Ver lead de origen
+              </span>
+            </Link>
+          ) : undefined
+        }
+      />
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Badge status="good">Activo</Badge>
+        <Badge status="neutral">Vendedor: {client.agentName}</Badge>
+        {client.aorName && <Badge status="neutral">AOR: {client.aorName}</Badge>}
+        {client.dob && <Badge status="info">{calculateAge(client.dob)} años</Badge>}
+      </div>
+
+      <Card>
+        <CardContent className="pt-5">
+          <Tabs
+            tabs={[
+              {
+                id: "overview",
+                label: "Overview",
+                content: (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-semibold uppercase text-[var(--ink-muted)]">Datos básicos</h4>
+                      <Info label="Teléfono" value={client.phone} />
+                      <Info label="Email" value={client.email} />
+                      <Info label="Dirección" value={client.address} />
+                      <Info label="Código postal" value={client.zipCode} />
+                      <Info label="Condado / Estado" value={client.county || client.state ? `${client.county ?? "—"}, ${client.state ?? "—"}` : undefined} />
+                      <Info label="Idioma preferido" value={client.preferredLanguage} />
+                      <Info label="Origen" value={client.sourceName} />
+                      {client.customFieldValues &&
+                        Object.entries(client.customFieldValues).map(([key, value]) => (
+                          <Info key={key} label={key} value={value} />
+                        ))}
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-semibold uppercase text-[var(--ink-muted)]">Resumen financiero</h4>
+                        <Info label="Pólizas activas" value={String(client.activePolicies)} />
+                        <Info label="Comisiones generadas" value={formatCurrency(totalCommissions)} />
+                      </div>
+                      <SensitiveDataPanel
+                        clientId={client.id}
+                        initialFields={client.sensitiveFields ?? []}
+                        canEdit={hasPermission(user, "clients", "edit")}
+                        canReveal={hasPermission(user, "sensitive_data", "view")}
+                      />
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                id: "policies",
+                label: "Pólizas",
+                content:
+                  policies.length === 0 ? (
+                    <Empty text="Sin pólizas registradas todavía." />
+                  ) : (
+                    <Table>
+                      <THead>
+                        <Tr>
+                          <Th>Número</Th>
+                          <Th>Línea</Th>
+                          <Th>Carrier</Th>
+                          <Th>Plan</Th>
+                          <Th>Prima</Th>
+                          <Th>Estado</Th>
+                        </Tr>
+                      </THead>
+                      <TBody>
+                        {policies.map((p) => (
+                          <Tr key={p.id}>
+                            <Td>{p.policyNumber ?? "—"}</Td>
+                            <Td>{p.line}</Td>
+                            <Td>{p.carrier}</Td>
+                            <Td>{p.planName ?? "—"}</Td>
+                            <Td>{p.premium != null ? formatCurrency(p.premium) : "—"}</Td>
+                            <Td><Badge status={statusToBadgeVariant(p.status)}>{p.status}</Badge></Td>
+                          </Tr>
+                        ))}
+                      </TBody>
+                    </Table>
+                  ),
+              },
+              {
+                id: "commissions",
+                label: "Comisiones",
+                content: (() => {
+                  const withCommission = policies.filter((p) => p.commission);
+                  return withCommission.length === 0 ? (
+                    <Empty text="Sin comisiones registradas todavía." />
+                  ) : (
+                    <Table>
+                      <THead>
+                        <Tr>
+                          <Th>Póliza</Th>
+                          <Th>Línea</Th>
+                          <Th>Agente</Th>
+                          <Th>AOR</Th>
+                          <Th>Estado</Th>
+                        </Tr>
+                      </THead>
+                      <TBody>
+                        {withCommission.map((p) => (
+                          <Tr key={p.id}>
+                            <Td>{p.policyNumber ?? "—"}</Td>
+                            <Td>{p.line}</Td>
+                            <Td>{p.commission!.agentAmount != null ? formatCurrency(p.commission!.agentAmount) : "—"}</Td>
+                            <Td>{p.commission!.aorAmount != null ? formatCurrency(p.commission!.aorAmount) : "—"}</Td>
+                            <Td><Badge status={statusToBadgeVariant(p.commission!.status)}>{p.commission!.status}</Badge></Td>
+                          </Tr>
+                        ))}
+                      </TBody>
+                    </Table>
+                  );
+                })(),
+              },
+              {
+                id: "sales",
+                label: "Ventas",
+                content: (
+                  <p className="text-sm text-[var(--ink-muted)]">
+                    El módulo de Ventas todavía no está conectado a base de datos real (fase posterior).
+                  </p>
+                ),
+              },
+              {
+                id: "activities",
+                label: "Actividades",
+                content: (
+                  <p className="text-sm text-[var(--ink-muted)]">
+                    El módulo de Actividades todavía no está conectado a base de datos real (fase posterior).
+                  </p>
+                ),
+              },
+              {
+                id: "tasks",
+                label: "Tareas",
+                content: (
+                  <p className="text-sm text-[var(--ink-muted)]">
+                    El módulo de Tareas todavía no está conectado a base de datos real (fase posterior).
+                  </p>
+                ),
+              },
+              {
+                id: "appointments",
+                label: "Citas",
+                content: (
+                  <p className="text-sm text-[var(--ink-muted)]">
+                    El módulo de Citas todavía no está conectado a base de datos real (fase posterior).
+                  </p>
+                ),
+              },
+              {
+                id: "documents",
+                label: "Documentos",
+                content: (
+                  <p className="text-sm text-[var(--ink-muted)]">
+                    El módulo de Documentos todavía no está conectado a base de datos real (fase posterior).
+                  </p>
+                ),
+              },
+              {
+                id: "notes",
+                label: "Notas",
+                content: (
+                  <p className="text-sm text-[var(--ink-muted)]">
+                    El módulo de Notas todavía no está conectado a base de datos real (fase posterior).
+                  </p>
+                ),
+              },
+              {
+                id: "insurance",
+                label: "Seguros",
+                content:
+                  client.linesOfBusiness.length === 0 ? (
+                    <Empty text="Sin líneas de seguro asociadas todavía." />
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {client.linesOfBusiness.map((l) => (
+                        <div
+                          key={l}
+                          className="flex items-center gap-2 rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm"
+                        >
+                          <ShieldCheck className="h-4 w-4 text-[var(--brand-500)]" /> {l}
+                        </div>
+                      ))}
+                    </div>
+                  ),
+              },
+              {
+                id: "medicare",
+                label: "Medicare",
+                content: (
+                  <MedicareProfileTab
+                    clientId={client.id}
+                    initialProfile={medicareProfile}
+                    carriers={medicareOptions.carriers}
+                    canEdit={canEditClient}
+                  />
+                ),
+              },
+              {
+                id: "obamacare",
+                label: "Obamacare",
+                content: (
+                  <ObamacareProfileTab
+                    clientId={client.id}
+                    initialProfile={obamacareProfile}
+                    carriers={obamacareOptions.carriers}
+                    canEdit={canEditClient}
+                  />
+                ),
+              },
+              {
+                id: "family_heritage",
+                label: "Family Heritage",
+                content: (
+                  <FamilyHeritageProfileTab
+                    clientId={client.id}
+                    initialProfile={familyHeritageProfile}
+                    canEdit={canEditClient}
+                  />
+                ),
+              },
+              {
+                id: "history",
+                label: "Historial",
+                content: (
+                  <div className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
+                    <ClipboardList className="h-4 w-4" /> El log de auditoría se activa en Fase 13.
+                  </div>
+                ),
+              },
+            ]}
+          />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+
+function Empty({ text }: { text: string }) {
+  return <p className="text-sm text-[var(--ink-muted)]">{text}</p>;
+}
