@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser, canViewAll, hasPermission } from "@/lib/auth";
 import { assertRelatedOwnership } from "@/lib/relatedRecords";
+import { recordTaskCompletedFeedEvent } from "@/lib/feed/systemEvents";
 import type { TaskPriority, TaskStatus } from "@prisma/client";
 
 export interface TaskActionResult {
@@ -84,6 +85,14 @@ export async function updateTaskStatusAction(taskId: string, status: TaskStatus)
   }
 
   await prisma.task.update({ where: { id: taskId }, data: { status } });
+
+  // Feed de Actividades (sección 12/21 del spec) — publica "Tarea
+  // finalizada" cuando corresponde. Aislado en su propio módulo y nunca
+  // lanza (ver recordTaskCompletedFeedEvent), así que no puede romper esta
+  // acción aunque falle.
+  if (status === "COMPLETED") {
+    await recordTaskCompletedFeedEvent({ taskId: task.id, taskTitle: task.title, userId: user.id });
+  }
 
   revalidatePath("/tasks");
   return { ok: true };

@@ -22,6 +22,7 @@ import {
   MessageCircle,
   Mail,
   FolderOpen,
+  Newspaper,
   type LucideIcon,
 } from "lucide-react";
 
@@ -53,6 +54,7 @@ const navItems: NavItem[] = [
   { href: "/calendar", label: "Calendario", icon: CalendarDays, color: "#1baf7a", badge: 0 },
   { href: "/commissions", label: "Comisiones", icon: DollarSign, color: "#eda100", badge: 0 },
   { href: "/documents", label: "Documentos", icon: FolderOpen, color: "#8b5cf6", badge: 0 },
+  { href: "/feed", label: "Feed", icon: Newspaper, color: "#9061f9", badge: 0 },
   { href: "/reports", label: "Reportes", icon: BarChart3, color: "#eb6834", badge: 0 },
   { href: "/settings", label: "Configuración", icon: Settings, color: "#898781", badge: 0 },
 ];

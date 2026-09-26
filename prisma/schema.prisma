@@ -82,6 +82,13 @@ model User {
   recognitionsReceived  Recognition[] @relation("RecognitionTo")
   recognitionsGiven     Recognition[] @relation("RecognitionFrom")
 
+  // Feed de Actividades — ver sección 16 al final del archivo.
+  feedPostsAuthored  FeedPost[]             @relation("FeedPostAuthor")
+  feedPostAudienceOf FeedPostAudienceUser[] @relation("FeedPostAudienceUser")
+  feedComments       FeedComment[]          @relation("FeedCommentAuthor")
+  feedReactions      FeedReaction[]         @relation("FeedReactionUser")
+  feedMentions       FeedMention[]          @relation("FeedMentionUser")
+
   conversationsAsA      Conversation[] @relation("ConversationUserA")
   conversationsAsB      Conversation[] @relation("ConversationUserB")
   messagesSent          Message[]      @relation("MessagesSent")
@@ -1351,4 +1358,149 @@ enum MailRetentionPolicy {
   DAYS_90
   YEAR_1
   INDEFINITE
+}
+
+// ---------------------------------------------------------------------------
+// 16. FEED DE ACTIVIDADES — centro de comunicación interna (inspirado en el
+// Activity Stream de Bitrix24). Módulo aislado: nada de lo de arriba se
+// modificó para agregar esto, salvo la relación inversa en User (mismo
+// patrón que documentsUploaded/recognitionsReceived) y un hook de una línea
+// en tasks/actions.ts para "Tarea finalizada" (ver src/lib/feed/systemEvents.ts).
+//
+// Los eventos de sistema "Nuevo cliente" / "Venta registrada" / "Usuario se
+// unió" NO requieren ningún hook adicional: se sintetizan a demanda leyendo
+// AuditLog (que ya existe) dentro de syncSystemEventsFromAuditLog(), y se
+// guardan como FeedPost normales con kind=SYSTEM para poder fijarlos/
+// filtrarlos igual que cualquier otro post. sourceAuditLogId evita duplicar
+// el mismo evento en cada sync.
+// ---------------------------------------------------------------------------
+
+model FeedPost {
+  id       String       @id @default(cuid())
+  // null solo en posts de sistema muy antiguos que se generen sin autor
+  // identificable — en la práctica siempre hay uno (quien disparó el evento).
+  authorId String?
+  author   User?        @relation("FeedPostAuthor", fields: [authorId], references: [id])
+  body     String?
+  kind     FeedPostKind @default(USER)
+
+  // Solo para kind=SYSTEM — ver src/lib/feed/systemEvents.ts.
+  systemEventType String?
+  systemEventData Json?
+  systemEntityType String?
+  systemEntityId   String?
+  sourceAuditLogId String? @unique
+
+  audience FeedAudience @default(EVERYONE)
+
+  isPinned  Boolean   @default(false)
+  pinnedAt  DateTime?
+  pinnedById String?
+
+  createdAt DateTime  @default(now())
+  editedAt  DateTime?
+
+  audienceUsers FeedPostAudienceUser[]
+  comments      FeedComment[]
+  reactions     FeedReaction[]
+  attachments   FeedAttachment[]
+  mentions      FeedMention[]
+
+  @@index([createdAt])
+  @@index([kind])
+}
+
+enum FeedPostKind {
+  USER
+  SYSTEM
+}
+
+enum FeedAudience {
+  EVERYONE
+  TEAM
+  SPECIFIC
+}
+
+// Audiencia == SPECIFIC — lista explícita de destinatarios elegidos en el
+// compositor. Para EVERYONE/TEAM esta tabla queda vacía (TEAM se resuelve en
+// consulta comparando el campo User.department, no se materializa acá).
+model FeedPostAudienceUser {
+  id     String @id @default(cuid())
+  postId String
+  post   FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String
+  user   User @relation("FeedPostAudienceUser", fields: [userId], references: [id])
+
+  @@unique([postId, userId])
+}
+
+model FeedComment {
+  id       String   @id @default(cuid())
+  postId   String
+  post     FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId String
+  author   User     @relation("FeedCommentAuthor", fields: [authorId], references: [id])
+  body     String
+
+  // Un solo nivel de respuesta (como el ejemplo del spec) — replyToId
+  // siempre apunta a un comentario de primer nivel, nunca a otra respuesta.
+  replyToId String?
+  replyTo   FeedComment?  @relation("FeedCommentReplies", fields: [replyToId], references: [id])
+  replies   FeedComment[] @relation("FeedCommentReplies")
+
+  createdAt DateTime @default(now())
+
+  mentions FeedMention[]
+
+  @@index([postId])
+}
+
+model FeedReaction {
+  id     String @id @default(cuid())
+  postId String
+  post   FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation("FeedReactionUser", fields: [userId], references: [id])
+  type   FeedReactionType
+
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+}
+
+enum FeedReactionType {
+  LIKE
+  LOVE
+  CELEBRATE
+  CLAP
+}
+
+// Mismo patrón sin almacenamiento externo que Document.fileUrl / adjuntos de
+// Correo interno: data URL embebida, límite validado en la Server Action.
+model FeedAttachment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  fileName  String
+  fileUrl   String
+  mimeType  String?
+  sizeBytes Int
+
+  createdAt DateTime @default(now())
+}
+
+// postId XOR commentId — una mención vive en un post o en un comentario,
+// nunca en ambos (lo valida la Server Action, no el schema).
+model FeedMention {
+  id              String        @id @default(cuid())
+  postId          String?
+  post            FeedPost?     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentId       String?
+  comment         FeedComment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  mentionedUserId String
+  mentionedUser   User          @relation("FeedMentionUser", fields: [mentionedUserId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([mentionedUserId])
 }

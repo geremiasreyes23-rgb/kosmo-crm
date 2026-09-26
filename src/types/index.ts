@@ -572,3 +572,134 @@ export interface CommissionVM {
   carrierPaymentDate?: string;
   status: CommissionStatus;
 }
+
+// ---------------------------------------------------------------------------
+// FEED DE ACTIVIDADES
+// ---------------------------------------------------------------------------
+
+export type FeedAudience = "EVERYONE" | "TEAM" | "SPECIFIC";
+export type FeedPostKind = "USER" | "SYSTEM";
+export type FeedReactionType = "LIKE" | "LOVE" | "CELEBRATE" | "CLAP";
+export type FeedSystemEventType =
+  | "CLIENT_CREATED"
+  | "SALE_CREATED"
+  | "USER_JOINED"
+  | "TASK_COMPLETED";
+export type FeedSortOrder = "recent" | "oldest" | "most_commented";
+export type FeedFilter = "all" | "mentions" | "mine" | "system";
+
+export interface FeedAuthorVM {
+  id: string;
+  name: string;
+  initials: string;
+  avatarUrl?: string;
+  avatarColor: string;
+  department?: string;
+  roleName?: string;
+}
+
+export interface FeedAttachmentVM {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+  mimeType?: string;
+  sizeBytes: number;
+}
+
+export interface FeedMentionVM {
+  userId: string;
+  name: string;
+}
+
+export interface FeedReactionSummary {
+  type: FeedReactionType;
+  count: number;
+  reactedByMe: boolean;
+}
+
+export interface FeedCommentVM {
+  id: string;
+  postId: string;
+  author: FeedAuthorVM;
+  body: string;
+  mentions: FeedMentionVM[];
+  replyToId?: string;
+  replyToAuthorName?: string;
+  createdAt: string;
+}
+
+export interface FeedPostVM {
+  id: string;
+  kind: FeedPostKind;
+  author?: FeedAuthorVM;
+  body?: string;
+  systemEventType?: FeedSystemEventType;
+  systemEntityHref?: string;
+  audience: FeedAudience;
+  audienceLabel: string;
+  isPinned: boolean;
+  canPin: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  isMine: boolean;
+  createdAt: string;
+  editedAt?: string;
+  attachments: FeedAttachmentVM[];
+  mentions: FeedMentionVM[];
+  comments: FeedCommentVM[];
+  commentCount: number;
+  reactions: FeedReactionSummary[];
+  myReaction?: FeedReactionType;
+  reactionCount: number;
+}
+
+export interface FeedUserOption {
+  id: string;
+  name: string;
+  department?: string;
+}
+
+export interface FeedMentionFeedItem {
+  id: string;
+  fromName: string;
+  excerpt: string;
+  href: string;
+  createdAt: string;
+}
+
+export interface FeedRecentActivityItem {
+  id: string;
+  label: string;
+  createdAt: string;
+  href?: string;
+}
+
+export interface FeedUpcomingEventItem {
+  id: string;
+  title: string;
+  startsAt: string;
+  durationMinutes: number;
+}
+
+export interface FeedSharedFileItem {
+  id: string;
+  fileName: string;
+  sizeBytes: number;
+  createdAt: string;
+  postId: string;
+}
+
+export interface FeedSidebarDataVM {
+  mentions: FeedMentionFeedItem[];
+  recentActivity: FeedRecentActivityItem[];
+  upcomingEvents: FeedUpcomingEventItem[];
+  sharedFiles: FeedSharedFileItem[];
+}
+
+export interface FeedPageDataVM {
+  currentUserId: string;
+  posts: FeedPostVM[];
+  users: FeedUserOption[];
+  sidebar: FeedSidebarDataVM;
+  canPostAsEveryone: boolean;
+}

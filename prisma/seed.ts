@@ -29,6 +29,7 @@ const RESOURCES = [
   "reports",
   "settings",
   "mail",
+  "feed",
 ] as const;
 const CRUD_ACTIONS = ["view", "create", "edit", "delete"] as const;
 
@@ -61,6 +62,14 @@ const EXTRA_PERMISSIONS: [string, string][] = [
   // registro de auditoría (quién cambió qué en todo el sistema, incluidos
   // otros usuarios) queda reservado a Admin/Super Admin vía allKeys.
   ["audit", "view"],
+  // Feed de Actividades — fijar/desfijar publicaciones ajenas y editar o
+  // eliminar publicaciones de otros usuarios (moderación). Editar/eliminar
+  // tu PROPIA publicación nunca requiere este permiso — eso lo valida la
+  // Server Action por autoría (feed:create ya lo cubre), igual que un
+  // mensaje propio en Mensajería. Se otorga a Manager además de Admin/
+  // Super Admin (vía allKeys) porque un supervisor también modera el feed
+  // de su equipo.
+  ["feed", "moderate"],
 ];
 
 function generateTempPassword(): string {
@@ -127,6 +136,7 @@ async function main() {
     ...businessResources.flatMap((r) => [`${r}:view`, `${r}:create`, `${r}:edit`]),
     "reports:export",
     "activities:review",
+    "feed:moderate",
   ]);
   await grant("Agent", businessResources.flatMap((r) => [`${r}:view`, `${r}:create`, `${r}:edit`]));
   await grant("Viewer", businessResources.map((r) => `${r}:view`));

@@ -15,6 +15,9 @@ import {
   Bell,
   ClipboardCheck,
   FileClock,
+  Newspaper,
+  MessageSquare,
+  ThumbsUp,
   type LucideIcon,
 } from "lucide-react";
 import type { NotificationVM } from "@/types";
@@ -60,6 +63,10 @@ export const NOTIFICATION_TYPE_META: Record<string, NotificationTypeMeta> = {
   daily_report_submitted: { icon: ListChecks, accent: "#e87ba4" },
   daily_report_reviewed: { icon: ClipboardCheck, accent: "#e87ba4" },
   documentation_pending: { icon: FileClock, accent: "#eda100" },
+  // Feed de Actividades
+  feed_post: { icon: Newspaper, accent: "#8b5cf6" },
+  feed_reply: { icon: MessageSquare, accent: "#8b5cf6" },
+  feed_reaction: { icon: ThumbsUp, accent: "#8b5cf6" },
 };
 
 const DEFAULT_META: NotificationTypeMeta = { icon: Bell, accent: "#898781" };
@@ -91,6 +98,8 @@ export function notificationHref(n: Pick<NotificationVM, "relatedEntityType" | "
     case "Activity":
     case "DailyReport":
       return "/activities";
+    case "FeedPost":
+      return n.relatedEntityId ? `/feed#post-${n.relatedEntityId}` : "/feed";
     default:
       return "#";
   }
