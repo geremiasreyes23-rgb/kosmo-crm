@@ -355,11 +355,11 @@ model Lead {
 
 model Client {
   id                String   @id @default(cuid())
-  /** ID visible del cliente — lo asigna el sistema (autoincremental de
-   * Postgres), nunca se captura a mano. Se muestra formateado como
-   * "C-000123" (ver formatClientCode en src/lib/utils.ts) y es buscable
-   * tanto en el filtro del módulo de Clientes como en el buscador global
-   * del header. */
+  // ID visible del cliente — lo asigna el sistema (autoincremental de
+  // Postgres), nunca se captura a mano. Se muestra formateado como
+  // "C-000123" (ver formatClientCode en src/lib/utils.ts) y es buscable
+  // tanto en el filtro del módulo de Clientes como en el buscador global
+  // del header.
   clientNumber      Int      @unique @default(autoincrement())
   originLead        Lead?
   firstName         String
