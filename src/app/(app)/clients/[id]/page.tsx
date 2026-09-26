@@ -17,6 +17,11 @@ import { getFamilyHeritageProfileForClient } from "./family-heritage/data";
 import { getActivitiesForUser } from "../../activities/data";
 import { getTasksForUser } from "../../tasks/data";
 import { getAppointmentsForUser } from "../../calendar/data";
+import { getSalesForUser } from "../../sales/data";
+import { getNotesForUser } from "@/lib/notes/data";
+import { getDocumentsForUser } from "@/lib/documents/data";
+import { NotesTab } from "@/components/records/NotesTab";
+import { DocumentsTab } from "@/components/records/DocumentsTab";
 import { formatCurrency, formatDate, formatTime, timeSince, calculateAge } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { ArrowLeftCircle, ClipboardList, ShieldCheck } from "lucide-react";
@@ -43,6 +48,9 @@ export default async function ClientDetailPage({
     clientActivities,
     clientTasks,
     clientAppointments,
+    clientSales,
+    clientNotes,
+    clientDocuments,
   ] = await Promise.all([
     getMedicareProfileForClient(id, user),
     getMedicareFormOptions(),
@@ -52,6 +60,9 @@ export default async function ClientDetailPage({
     getActivitiesForUser(user, { clientId: id }),
     getTasksForUser(user, { clientId: id }),
     getAppointmentsForUser(user, { clientId: id }),
+    getSalesForUser(user, { clientId: id }),
+    getNotesForUser(user, { clientId: id }),
+    getDocumentsForUser(user, { clientId: id }),
   ]);
 
   const policies = client.policies ?? [];
@@ -188,7 +199,35 @@ export default async function ClientDetailPage({
               {
                 id: "sales",
                 label: "Ventas",
-                content: <Empty text="Sin ventas registradas para este cliente todavía." />,
+                content:
+                  clientSales.length === 0 ? (
+                    <Empty text="Sin ventas registradas para este cliente todavía." />
+                  ) : (
+                    <Table>
+                      <THead>
+                        <Tr>
+                          <Th>Línea</Th>
+                          <Th>Carrier</Th>
+                          <Th>Plan</Th>
+                          <Th>Prima</Th>
+                          <Th>Comisión esperada</Th>
+                          <Th>Fecha</Th>
+                        </Tr>
+                      </THead>
+                      <TBody>
+                        {clientSales.map((s) => (
+                          <Tr key={s.id}>
+                            <Td>{s.line}</Td>
+                            <Td>{s.carrier}</Td>
+                            <Td>{s.planName ?? "—"}</Td>
+                            <Td>{formatCurrency(s.premium)}</Td>
+                            <Td>{s.expectedCommission != null ? formatCurrency(s.expectedCommission) : "—"}</Td>
+                            <Td>{formatDate(s.saleDate)}</Td>
+                          </Tr>
+                        ))}
+                      </TBody>
+                    </Table>
+                  ),
               },
               {
                 id: "activities",
@@ -253,12 +292,20 @@ export default async function ClientDetailPage({
               {
                 id: "documents",
                 label: "Documentos",
-                content: <Empty text="Sin documentos adjuntos todavía." />,
+                content: (
+                  <DocumentsTab
+                    clientId={client.id}
+                    initialDocuments={clientDocuments}
+                    canEdit={canEditClient}
+                  />
+                ),
               },
               {
                 id: "notes",
                 label: "Notas",
-                content: <Empty text="Sin notas registradas todavía." />,
+                content: (
+                  <NotesTab clientId={client.id} initialNotes={clientNotes} canEdit={canEditClient} />
+                ),
               },
               {
                 id: "insurance",

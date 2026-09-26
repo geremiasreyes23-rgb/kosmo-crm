@@ -4,7 +4,6 @@
 import type {
   Lead,
   Client,
-  Sale,
   CrmTask,
   ActivityItem,
   AppointmentItem,
@@ -26,15 +25,6 @@ export const leadPipelineStages: PipelineStage[] = [
   { id: "not_interested", name: "No interesado", order: 10, isLost: true },
   { id: "not_qualified", name: "No califica", order: 11, isLost: true },
   { id: "lost", name: "Perdido", order: 12, isLost: true },
-];
-
-export const salesPipelineStages: PipelineStage[] = [
-  { id: "s_quote", name: "Cotización", order: 1 },
-  { id: "s_application", name: "Aplicación", order: 2 },
-  { id: "s_pending", name: "Pendiente", order: 3 },
-  { id: "s_approved", name: "Aprobada", order: 4 },
-  { id: "s_won", name: "Cerrada", order: 5, isWon: true },
-  { id: "s_lost", name: "Perdida", order: 6, isLost: true },
 ];
 
 export const dashboardSummary: DashboardSummary = {
@@ -105,13 +95,6 @@ export const clients: Client[] = [
   { id: "C-3082", firstName: "Manuel", lastName: "Torres", dob: "1972-11-02", phone: "(786) 555-0212", email: "manuel.torres@example.com", address: "45 SW 8th St", state: "FL", county: "Miami-Dade", preferredLanguage: "Español", agentName: "Ana Ibarra", createdAt: "2024-01-22", activePolicies: 1, linesOfBusiness: ["Obamacare"] },
   { id: "C-3083", firstName: "Gloria", lastName: "Mendoza", dob: "1960-07-19", phone: "(407) 555-0223", address: "780 Orange Ave", state: "FL", county: "Orange", preferredLanguage: "Español", agentName: "Carlos Gómez", createdAt: "2022-09-30", activePolicies: 3, linesOfBusiness: ["Medicare Advantage", "Family Heritage"] },
   { id: "C-3084", firstName: "Ricardo", lastName: "Vega", dob: "1985-02-28", phone: "(954) 555-0234", address: "22 Las Olas Blvd", state: "FL", county: "Broward", preferredLanguage: "Inglés", agentName: "Ana Ibarra", createdAt: "2025-06-14", activePolicies: 1, linesOfBusiness: ["Obamacare"] },
-];
-
-export const salesPipeline: Sale[] = [
-  { id: "S-501", clientName: "Luis Fernández", agentName: "Ana Ibarra", line: "Medicare Advantage", carrier: "Humana", premium: 0, stageId: "s_quote", saleDate: "2026-09-10", expectedCommission: 480 },
-  { id: "S-502", clientName: "Yolanda Pérez", agentName: "Carlos Gómez", line: "Obamacare", carrier: "Oscar Health", premium: 142, stageId: "s_application", saleDate: "2026-09-08", expectedCommission: 210 },
-  { id: "S-503", clientName: "Roberto Díaz", agentName: "Ana Ibarra", line: "Obamacare", carrier: "Ambetter", premium: 98, stageId: "s_pending", saleDate: "2026-09-05", expectedCommission: 195 },
-  { id: "S-504", clientName: "Carmen Salazar", agentName: "Carlos Gómez", line: "Family Heritage", carrier: "Family Heritage Life", premium: 76, stageId: "s_approved", saleDate: "2026-09-02", expectedCommission: 320 },
 ];
 
 export const tasks: CrmTask[] = [

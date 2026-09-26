@@ -221,6 +221,34 @@ async function main() {
     });
   }
 
+  console.log("Sembrando pipeline real de Ventas...");
+  const salesPipeline = await prisma.pipeline.upsert({
+    where: { id: "sales-pipeline-default" },
+    update: {},
+    create: { id: "sales-pipeline-default", name: "Pipeline de Ventas", entityType: "SALE", isDefault: true },
+  });
+  const saleStageDefs = [
+    { name: "Cotización" },
+    { name: "Aplicación" },
+    { name: "Pendiente" },
+    { name: "Aprobada" },
+    { name: "Cerrada", isWon: true },
+    { name: "Perdida", isLost: true },
+  ];
+  for (const [i, def] of saleStageDefs.entries()) {
+    await prisma.pipelineStage.upsert({
+      where: { pipelineId_order: { pipelineId: salesPipeline.id, order: i } },
+      update: { name: def.name, isWon: !!def.isWon, isLost: !!def.isLost },
+      create: {
+        pipelineId: salesPipeline.id,
+        order: i,
+        name: def.name,
+        isWon: !!def.isWon,
+        isLost: !!def.isLost,
+      },
+    });
+  }
+
   console.log("Sembrando campos personalizados de Leads...");
   // Específicos por línea de negocio — solo aparecen cuando ese lead marca
   // interés en esa línea. Ver src/data/customFields.ts (versión mock que

@@ -139,16 +139,55 @@ export interface Policy {
   agentName: string;
 }
 
+export type SaleMethod = "PHONE" | "IN_PERSON" | "VIRTUAL" | "ONLINE";
+
 export interface Sale {
   id: string;
+  /** Se liga a un Client O a un Lead, nunca ambos (ver Sale en el schema) —
+   * igual convención que Activity/Task/Appointment. */
+  clientId?: string;
+  leadId?: string;
+  /** Nombre del cliente o lead vinculado, listo para mostrar. */
   clientName: string;
+  agentId?: string;
   agentName: string;
+  insuranceLineId?: string;
   line: string;
+  carrierId?: string;
   carrier: string;
+  planName?: string;
   premium: number;
+  method?: SaleMethod;
   stageId: string;
   saleDate: string;
+  effectiveDate?: string;
   expectedCommission?: number;
+  receivedCommission?: number;
+  /** Presente solo si esta venta ya generó su Policy (al llegar a una etapa
+   * isWon) — ver sección 6.C del brief de arquitectura. */
+  policyId?: string;
+}
+
+export interface NoteVM {
+  id: string;
+  body: string;
+  createdAt: string;
+  leadId?: string;
+  clientId?: string;
+  policyId?: string;
+}
+
+export interface DocumentVM {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+  category?: string;
+  uploadedByName: string;
+  uploadedAt: string;
+  leadId?: string;
+  clientId?: string;
+  saleId?: string;
+  policyId?: string;
 }
 
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";

@@ -1,39 +1,68 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CrmSubNav } from "@/components/layout/CrmSubNav";
 import { Button } from "@/components/ui/Button";
 import { KanbanBoard } from "@/components/ui/Kanban";
 import { Drawer } from "@/components/ui/Drawer";
 import { FieldWrapper, Input, Select } from "@/components/ui/Field";
-import type { PipelineStage, Sale } from "@/types";
+import type { PipelineStage, Sale, SaleMethod } from "@/types";
+import type { SaleFormOptions } from "./data";
+import type { RelatedEntityOptions } from "@/lib/relatedRecords";
 import { formatCurrency } from "@/lib/utils";
 import { Plus, Handshake, Search } from "lucide-react";
+import { createSaleAction, moveSaleStageAction } from "./actions";
 
-const emptyForm = {
-  clientName: "",
-  agentName: "Carlos Gómez",
-  line: "Medicare Advantage",
-  carrier: "Humana",
-  premium: 0,
-  expectedCommission: 0,
+const METHOD_LABELS: Record<SaleMethod, string> = {
+  PHONE: "Teléfono",
+  IN_PERSON: "En persona",
+  VIRTUAL: "Virtual",
+  ONLINE: "En línea",
 };
+
+function emptyForm() {
+  return {
+    related: "",
+    insuranceLineId: "",
+    carrierId: "",
+    planName: "",
+    premium: "",
+    expectedCommission: "",
+    method: "" as SaleMethod | "",
+    agentId: "",
+  };
+}
 
 export function SalesView({
   initialSales,
   stages,
+  formOptions,
+  relatedOptions,
+  canAssignOthers,
 }: {
   initialSales: Sale[];
   stages: PipelineStage[];
+  formOptions: SaleFormOptions;
+  relatedOptions: RelatedEntityOptions;
+  canAssignOthers: boolean;
 }) {
+  const router = useRouter();
   const [sales, setSales] = useState<Sale[]>(initialSales);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [initialStage, setInitialStage] = useState(stages[0]?.id ?? "s_quote");
-  const [form, setForm] = useState(emptyForm);
-  const [search, setSearch] = useState("");
+  useEffect(() => setSales(initialSales), [initialSales]);
 
-  const nextId = useMemo(() => `S-${505 + sales.length}`, [sales.length]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [initialStage, setInitialStage] = useState(stages[0]?.id ?? "");
+  const [form, setForm] = useState(emptyForm());
+  const [search, setSearch] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const availableCarriers = useMemo(() => {
+    if (!form.insuranceLineId) return formOptions.carriers;
+    return formOptions.carriers.filter((c) => c.insuranceLineIds.includes(form.insuranceLineId));
+  }, [formOptions.carriers, form.insuranceLineId]);
 
   const visibleSales = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -47,30 +76,56 @@ export function SalesView({
   }, [sales, search]);
 
   function handleMove(itemId: string, newStageId: string) {
+    const previous = sales;
     setSales((prev) => prev.map((s) => (s.id === itemId ? { ...s, stageId: newStageId } : s)));
+    moveSaleStageAction(itemId, newStageId).then((result) => {
+      if (!result.ok) {
+        setSales(previous);
+        window.alert(result.error ?? "No se pudo mover la venta de etapa.");
+      } else {
+        router.refresh();
+      }
+    });
   }
 
   function openDrawer(stageId: string) {
     setInitialStage(stageId);
-    setForm(emptyForm);
+    setForm(emptyForm());
+    setFormError(null);
     setDrawerOpen(true);
   }
 
-  function handleSubmit() {
-    if (!form.clientName) return;
-    const newSale: Sale = {
-      id: nextId,
-      clientName: form.clientName,
-      agentName: form.agentName,
-      line: form.line,
-      carrier: form.carrier,
-      premium: Number(form.premium) || 0,
+  async function handleSubmit() {
+    const [kind, id] = form.related.split(":");
+    if (!kind || !id) {
+      setFormError("Vincula la venta a un cliente o a un lead.");
+      return;
+    }
+    if (!form.insuranceLineId || !form.carrierId) {
+      setFormError("Línea de negocio y carrier son obligatorios.");
+      return;
+    }
+    setSubmitting(true);
+    setFormError(null);
+    const result = await createSaleAction({
+      relatedLeadId: kind === "lead" ? id : undefined,
+      relatedClientId: kind === "client" ? id : undefined,
+      insuranceLineId: form.insuranceLineId,
+      carrierId: form.carrierId,
+      planName: form.planName || undefined,
+      premium: form.premium ? Number(form.premium) : undefined,
+      expectedCommission: form.expectedCommission ? Number(form.expectedCommission) : undefined,
+      method: form.method || undefined,
       stageId: initialStage,
-      saleDate: new Date().toISOString().slice(0, 10),
-      expectedCommission: Number(form.expectedCommission) || 0,
-    };
-    setSales((prev) => [newSale, ...prev]);
+      agentId: canAssignOthers ? form.agentId || undefined : undefined,
+    });
+    setSubmitting(false);
+    if (!result.ok) {
+      setFormError(result.error ?? "No se pudo crear la venta.");
+      return;
+    }
     setDrawerOpen(false);
+    router.refresh();
   }
 
   return (
@@ -79,7 +134,7 @@ export function SalesView({
       <PageHeader
         title="Ventas"
         actions={
-          <Button size="sm" className="rounded-full" onClick={() => openDrawer(stages[0]?.id ?? "s_quote")}>
+          <Button size="sm" className="rounded-full" onClick={() => openDrawer(stages[0]?.id ?? "")}>
             <Plus className="h-4 w-4" /> Crear
           </Button>
         }
@@ -132,56 +187,115 @@ export function SalesView({
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         title="Nueva venta"
-        subtitle={`Se creará en la etapa "${stages.find((s) => s.id === initialStage)?.name}"`}
+        subtitle={`Se creará en la etapa "${stages.find((s) => s.id === initialStage)?.name ?? ""}"`}
         footer={
           <>
-            <Button variant="secondary" size="sm" onClick={() => setDrawerOpen(false)}>
+            <Button variant="secondary" size="sm" onClick={() => setDrawerOpen(false)} disabled={submitting}>
               Cancelar
             </Button>
-            <Button size="sm" onClick={handleSubmit}>
-              Crear venta
+            <Button size="sm" onClick={handleSubmit} disabled={submitting}>
+              {submitting ? "Creando..." : "Crear venta"}
             </Button>
           </>
         }
       >
         <div className="space-y-4">
+          {formError && (
+            <p className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-[var(--status-critical)]">
+              {formError}
+            </p>
+          )}
           <FieldWrapper label="Cliente / Lead">
-            <Input value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} />
+            <Select value={form.related} onChange={(e) => setForm({ ...form, related: e.target.value })}>
+              <option value="">Selecciona uno</option>
+              {relatedOptions.clients.length > 0 && (
+                <optgroup label="Clientes">
+                  {relatedOptions.clients.map((c) => (
+                    <option key={c.id} value={`client:${c.id}`}>
+                      {c.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {relatedOptions.leads.length > 0 && (
+                <optgroup label="Leads">
+                  {relatedOptions.leads.map((l) => (
+                    <option key={l.id} value={`lead:${l.id}`}>
+                      {l.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </Select>
           </FieldWrapper>
           <div className="grid grid-cols-2 gap-3">
             <FieldWrapper label="Línea de negocio">
-              <Select value={form.line} onChange={(e) => setForm({ ...form, line: e.target.value })}>
-                <option>Medicare Advantage</option>
-                <option>Obamacare</option>
-                <option>Family Heritage</option>
+              <Select
+                value={form.insuranceLineId}
+                onChange={(e) => setForm({ ...form, insuranceLineId: e.target.value, carrierId: "" })}
+              >
+                <option value="">Selecciona</option>
+                {formOptions.insuranceLines.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
               </Select>
             </FieldWrapper>
             <FieldWrapper label="Carrier">
-              <Input value={form.carrier} onChange={(e) => setForm({ ...form, carrier: e.target.value })} />
+              <Select value={form.carrierId} onChange={(e) => setForm({ ...form, carrierId: e.target.value })}>
+                <option value="">Selecciona</option>
+                {availableCarriers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
             </FieldWrapper>
           </div>
+          <FieldWrapper label="Plan (opcional)">
+            <Input value={form.planName} onChange={(e) => setForm({ ...form, planName: e.target.value })} />
+          </FieldWrapper>
           <div className="grid grid-cols-2 gap-3">
             <FieldWrapper label="Prima mensual">
               <Input
                 type="number"
                 value={form.premium}
-                onChange={(e) => setForm({ ...form, premium: Number(e.target.value) })}
+                onChange={(e) => setForm({ ...form, premium: e.target.value })}
               />
             </FieldWrapper>
             <FieldWrapper label="Comisión esperada">
               <Input
                 type="number"
                 value={form.expectedCommission}
-                onChange={(e) => setForm({ ...form, expectedCommission: Number(e.target.value) })}
+                onChange={(e) => setForm({ ...form, expectedCommission: e.target.value })}
               />
             </FieldWrapper>
           </div>
-          <FieldWrapper label="Vendedor">
-            <Select value={form.agentName} onChange={(e) => setForm({ ...form, agentName: e.target.value })}>
-              <option>Carlos Gómez</option>
-              <option>Ana Ibarra</option>
-            </Select>
-          </FieldWrapper>
+          <div className="grid grid-cols-2 gap-3">
+            <FieldWrapper label="Método">
+              <Select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value as SaleMethod | "" })}>
+                <option value="">Sin especificar</option>
+                {(Object.keys(METHOD_LABELS) as SaleMethod[]).map((m) => (
+                  <option key={m} value={m}>
+                    {METHOD_LABELS[m]}
+                  </option>
+                ))}
+              </Select>
+            </FieldWrapper>
+            {canAssignOthers && (
+              <FieldWrapper label="Vendedor">
+                <Select value={form.agentId} onChange={(e) => setForm({ ...form, agentId: e.target.value })}>
+                  <option value="">Yo mismo</option>
+                  {formOptions.agents.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </Select>
+              </FieldWrapper>
+            )}
+          </div>
           <FieldWrapper label="Etapa inicial">
             <Select value={initialStage} onChange={(e) => setInitialStage(e.target.value)}>
               {stages.map((s) => (

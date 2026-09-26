@@ -4,10 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge, statusToBadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
-import { requireUser } from "@/lib/auth";
+import { requireUser, hasPermission } from "@/lib/auth";
 import { getLeadForUser, getLeadPipelineStages } from "../data";
 import { getActivitiesForUser } from "../../activities/data";
 import { getTasksForUser } from "../../tasks/data";
+import { getNotesForUser } from "@/lib/notes/data";
+import { getDocumentsForUser } from "@/lib/documents/data";
+import { NotesTab } from "@/components/records/NotesTab";
+import { DocumentsTab } from "@/components/records/DocumentsTab";
 import { formatDate } from "@/lib/utils";
 import { ConvertToClientButton } from "@/components/leads/ConvertToClientButton";
 import { UserCheck } from "lucide-react";
@@ -22,14 +26,17 @@ export default async function LeadDetailPage({
 }) {
   const { id } = await params;
   const user = await requireUser();
-  const [lead, stages, leadActivities, leadTasks] = await Promise.all([
+  const [lead, stages, leadActivities, leadTasks, leadNotes, leadDocuments] = await Promise.all([
     getLeadForUser(id, user),
     getLeadPipelineStages(),
     getActivitiesForUser(user, { leadId: id }),
     getTasksForUser(user, { leadId: id }),
+    getNotesForUser(user, { leadId: id }),
+    getDocumentsForUser(user, { leadId: id }),
   ]);
   if (!lead) return notFound();
   const stage = stages.find((s) => s.id === lead.stageId);
+  const canEditLead = hasPermission(user, "leads", "edit");
 
   return (
     <div>
@@ -131,8 +138,18 @@ export default async function LeadDetailPage({
                         </div>
                       ),
                   },
-                  { id: "notes", label: "Notas", content: <p className="text-sm text-[var(--ink-muted)]">Sin notas todavía.</p> },
-                  { id: "documents", label: "Documentos", content: <p className="text-sm text-[var(--ink-muted)]">Sin documentos adjuntos.</p> },
+                  {
+                    id: "notes",
+                    label: "Notas",
+                    content: <NotesTab leadId={lead.id} initialNotes={leadNotes} canEdit={canEditLead} />,
+                  },
+                  {
+                    id: "documents",
+                    label: "Documentos",
+                    content: (
+                      <DocumentsTab leadId={lead.id} initialDocuments={leadDocuments} canEdit={canEditLead} />
+                    ),
+                  },
                 ]}
               />
             </CardContent>
