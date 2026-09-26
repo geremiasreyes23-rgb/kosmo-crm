@@ -13,9 +13,16 @@ import { randomBytes } from "crypto";
 
 const prisma = new PrismaClient();
 
-const SUPER_ADMIN_EMAIL = "geremiasreyes23@gmail.com";
-const SUPER_ADMIN_FIRST_NAME = "Geremias";
-const SUPER_ADMIN_LAST_NAME = "Valdez";
+// Fase 15 (preparación para producción) — antes esto era el nombre y
+// correo reales de una persona concreta, hardcodeados en el código fuente
+// versionado. Ahora se leen de variables de entorno (ver .env.example) con
+// estos mismos valores como default, así que ninguna instalación existente
+// cambia de comportamiento — pero un despliegue nuevo (u otra agencia, si
+// esto se ofrece a más de un cliente algún día) puede fijar su propio Super
+// Admin sin editar el seed.
+const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || "geremiasreyes23@gmail.com";
+const SUPER_ADMIN_FIRST_NAME = process.env.SUPER_ADMIN_FIRST_NAME || "Geremias";
+const SUPER_ADMIN_LAST_NAME = process.env.SUPER_ADMIN_LAST_NAME || "Valdez";
 
 const RESOURCES = [
   "leads",

@@ -31,6 +31,26 @@ const nextConfig: NextConfig = {
     "*.ngrok.io",
     "*.ngrok.app",
   ],
+
+  // Fase 15 (preparación para producción) — Next.js no agrega estos headers
+  // por defecto. Es una herramienta interna detrás de login (no un sitio
+  // público), así que el enfoque es defensa básica en profundidad, no una
+  // política de CSP estricta que podría romper algo (Recharts, Three.js del
+  // logo animado, data: URLs de avatares/adjuntos embebidos) sin más
+  // pruebas — de ahí que no se agregue Content-Security-Policy todavía.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

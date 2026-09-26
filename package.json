@@ -2,9 +2,12 @@
   "name": "alliance-insurance-crm",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "prisma migrate deploy && next start -p ${PORT:-3000}",
     "lint": "next lint",
