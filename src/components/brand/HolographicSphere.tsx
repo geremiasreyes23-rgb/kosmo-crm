@@ -23,18 +23,27 @@ const MAX_PIXEL_RATIO = 2; // el logo es pequeño, así que ir más nítido aqu�
 // El tuning original (1500 partículas, puntos de 3.6px) está pensado para
 // el tamaño de referencia del login (~88px). El tamaño de punto NO escala
 // solo con el contenedor (gl_PointSize es en píxeles de pantalla, no en
-// unidades del mundo 3D) — a un tamaño más chico (p. ej. 28px del ícono
-// del sidebar recogido), esos mismos puntos se encimarían tanto que la
-// esfera se ve como un disco sólido en vez de partículas. Por eso el
-// conteo y el tamaño de punto se derivan del tamaño real solicitado.
+// unidades del mundo 3D) — a un tamaño más chico (p. ej. 30px del ícono
+// del sidebar), esos mismos puntos se encimarían tanto que la esfera se ve
+// como un disco sólido en vez de partículas. Por eso el conteo y el tamaño
+// de punto se derivan del tamaño real solicitado.
+//
+// El conteo escala LINEAL con el tamaño (no cuadrático como antes): con
+// scale^2, un logo chico como el de 30px del sidebar quedaba con apenas
+// ~220 partículas — tan disperso que contra el degradado morado del header
+// casi no se veía (reportado: "la esfera casi no se ve, ponerla más
+// densa"). Lineal conserva mucha más densidad relativa a tamaños chicos,
+// sin cambiar nada a tamaño de referencia o mayor (scale=1 da el mismo
+// resultado de siempre). El piso de tamaño de punto también sube un poco
+// por la misma razón: a 1.6px cada partícula era casi invisible.
 const REFERENCE_SIZE = 88;
 function particleCountForSize(size: number) {
   const scale = Math.min(1, size / REFERENCE_SIZE);
-  return Math.max(220, Math.round(1500 * scale * scale));
+  return Math.max(420, Math.round(1500 * scale));
 }
 function basePointSizeForSize(size: number) {
   const scale = Math.min(1, size / REFERENCE_SIZE);
-  return Math.max(1.6, 3.6 * scale);
+  return Math.max(2.2, 3.6 * scale);
 }
 
 const VERTEX_SHADER = /* glsl */ `
