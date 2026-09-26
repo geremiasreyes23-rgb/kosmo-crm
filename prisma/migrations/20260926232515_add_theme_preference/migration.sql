@@ -1,0 +1,5 @@
+-- CreateEnum
+CREATE TYPE "ThemeName" AS ENUM ('AURORA_VIOLET', 'NEBULA_BLUE', 'COSMIC_ROSE', 'GALAXY_CYAN');
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "themePreference" "ThemeName" NOT NULL DEFAULT 'AURORA_VIOLET';

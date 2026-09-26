@@ -23,15 +23,20 @@ import type { CSSProperties } from "react";
  * degradado cambia de tono sin que este archivo ni sus consumidores
  * (Sidebar, Header, AppShell) sepan nada del tema activo.
  *
- * `transition` va acá puntualmente (y no como regla CSS global) porque
- * `background-image` no siempre interpola entre degradados — declarar la
- * transición junto al propio valor es lo mínimo necesario para que el
- * cambio de tema se sienta suave donde el navegador lo soporte, sin tocar
- * ningún otro elemento de la interfaz.
+ * IMPORTANTE: este objeto se mezcla (spread) dentro del `style` de varios
+ * elementos que YA declaran sus propias transiciones por clase de Tailwind
+ * (ej. el riel del Sidebar usa `transition-[width] duration-200 ease-out`
+ * para la animación de expandir/recoger). Un `style` en línea le gana
+ * siempre a cualquier clase para la MISMA propiedad CSS — así que agregar
+ * `transition` acá (probado en la fase de temas) rompía esa animación del
+ * Sidebar en todos los elementos que reusan este objeto, sin importar que
+ * fuera un `transition-property` distinto. Por eso este objeto NO declara
+ * `transition`: el cambio de degradado al elegir un tema simplemente se
+ * aplica de inmediato (coherente con el pedido original: "no recargar la
+ * página, cambiar los colores inmediatamente").
  */
 export const CHROME_GRADIENT_STYLE: CSSProperties = {
   backgroundImage: "var(--theme-chrome-gradient)",
   backgroundAttachment: "fixed",
   backgroundColor: "var(--theme-chrome-bg)",
-  transition: "background-color 220ms ease",
 };
