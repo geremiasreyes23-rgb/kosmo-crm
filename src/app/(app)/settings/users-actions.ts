@@ -50,6 +50,16 @@ export async function createUserAction(input: {
     return { ok: false, error: "Completa nombre, apellido, correo y rol." };
   }
 
+  // Fase 15 (auditoría de seguridad) — sin esto, un Admin podía crear una
+  // cuenta Super Admin nueva pasando ese roleId a mano (la UI no ofrece esa
+  // opción, pero la Server Action no lo impedía). Solo un Super Admin puede
+  // otorgar el rol Super Admin.
+  const targetRole = await prisma.role.findUnique({ where: { id: input.roleId }, select: { name: true } });
+  if (!targetRole) return { ok: false, error: "El rol seleccionado no es válido." };
+  if (targetRole.name === "Super Admin" && current.roleName !== "Super Admin") {
+    return { ok: false, error: "Solo un Super Admin puede crear otra cuenta Super Admin." };
+  }
+
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     return { ok: false, error: "Ya existe un usuario con ese correo." };
@@ -112,7 +122,25 @@ export async function updateUserAction(
     return { ok: false, error: "Ese correo ya lo usa otro usuario." };
   }
 
-  const before = await prisma.user.findUnique({ where: { id: userId }, select: { roleId: true } });
+  const before = await prisma.user.findUnique({ where: { id: userId }, select: { roleId: true, role: { select: { name: true } } } });
+
+  // Fase 15 (auditoría de seguridad) — mismo guard que createUserAction: un
+  // Admin no puede ascender a nadie a Super Admin. Además, si el objetivo
+  // YA es Super Admin y el nuevo rol no lo es, hay que asegurarse de que no
+  // sea el último (mismo criterio que setUserStatusAction al desactivar).
+  if (before?.roleId !== input.roleId) {
+    const targetRole = await prisma.role.findUnique({ where: { id: input.roleId }, select: { name: true } });
+    if (!targetRole) return { ok: false, error: "El rol seleccionado no es válido." };
+    if (targetRole.name === "Super Admin" && current.roleName !== "Super Admin") {
+      return { ok: false, error: "Solo un Super Admin puede asignar el rol Super Admin." };
+    }
+    if (before?.role.name === "Super Admin" && targetRole.name !== "Super Admin") {
+      const remaining = await activeSuperAdminCount(userId);
+      if (remaining === 0) {
+        return { ok: false, error: "Debe quedar al menos un Super Admin activo — no puedes cambiarle el rol al último." };
+      }
+    }
+  }
 
   const updated = await prisma.user.update({
     where: { id: userId },

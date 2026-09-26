@@ -98,8 +98,14 @@ export async function reviewDailyReportAction(
 
   const trimmedComment = reviewComment?.trim() || null;
 
-  await prisma.dailyReport.update({
-    where: { id: reportId },
+  // Fase 15 (auditoría de seguridad) — el check "status !== PENDING" de
+  // arriba no es atómico con este update: dos supervisores revisando el
+  // mismo reporte casi al mismo tiempo podían pasarlo ambos y pisarse la
+  // decisión (y disparar dos notificaciones contradictorias). El
+  // updateMany condicional solo aplica si SIGUE en PENDING en ese instante;
+  // si otro ya lo revisó, count queda en 0 y se corta acá sin notificar.
+  const claimed = await prisma.dailyReport.updateMany({
+    where: { id: reportId, status: "PENDING" },
     data: {
       status,
       reviewedById: user.id,
@@ -107,6 +113,9 @@ export async function reviewDailyReportAction(
       reviewComment: trimmedComment,
     },
   });
+  if (claimed.count === 0) {
+    return { ok: false, error: "Este reporte ya fue revisado por otra persona." };
+  }
 
   await notifyUser({
     userId: report.userId,

@@ -171,34 +171,57 @@ export async function convertLeadToClientAction(leadId: string): Promise<Convert
     return { ok: true, clientId: lead.convertedClientId };
   }
 
-  const client = await prisma.$transaction(async (tx) => {
-    const created = await tx.client.create({
-      data: {
-        firstName: lead.firstName,
-        lastName: lead.lastName,
-        dob: lead.dob,
-        phone: lead.phone,
-        email: lead.email,
-        address: lead.address,
-        zipCode: lead.zipCode,
-        county: lead.county,
-        state: lead.state,
-        preferredLanguage: lead.preferredLanguage,
-        sourceId: lead.sourceId,
-        agentId: lead.agentId,
-        aorId: lead.aorId,
-      },
+  // Fase 15 (auditoría de seguridad) — el check de arriba (lead.convertedClientId)
+  // se hizo ANTES de esta transacción, así que dos conversiones concurrentes
+  // (doble clic, dos pestañas) podían pasarlo ambas y crear dos Client
+  // duplicados para el mismo lead. El updateMany condicional de abajo
+  // (WHERE convertedClientId IS NULL) es la parte que realmente lo evita:
+  // bajo Postgres, la segunda transacción queda bloqueada en ese UPDATE
+  // hasta que la primera confirma, y al reevaluar la condición ya no
+  // coincide (count === 0) — ahí se descarta (rollback) el Client duplicado
+  // que esa segunda transacción alcanzó a crear.
+  let client;
+  try {
+    client = await prisma.$transaction(async (tx) => {
+      const created = await tx.client.create({
+        data: {
+          firstName: lead.firstName,
+          lastName: lead.lastName,
+          dob: lead.dob,
+          phone: lead.phone,
+          email: lead.email,
+          address: lead.address,
+          zipCode: lead.zipCode,
+          county: lead.county,
+          state: lead.state,
+          preferredLanguage: lead.preferredLanguage,
+          sourceId: lead.sourceId,
+          agentId: lead.agentId,
+          aorId: lead.aorId,
+        },
+      });
+      const claimed = await tx.lead.updateMany({
+        where: { id: leadId, convertedClientId: null },
+        data: { convertedClientId: created.id, convertedAt: new Date() },
+      });
+      if (claimed.count === 0) {
+        throw new Error("LEAD_ALREADY_CONVERTED");
+      }
+      await logAudit(
+        { userId: user.id, action: "CREATE", entityType: "Client", entityId: created.id, fieldName: "convertedFromLeadId", newValue: leadId },
+        tx
+      );
+      return created;
     });
-    await tx.lead.update({
-      where: { id: leadId },
-      data: { convertedClientId: created.id, convertedAt: new Date() },
-    });
-    await logAudit(
-      { userId: user.id, action: "CREATE", entityType: "Client", entityId: created.id, fieldName: "convertedFromLeadId", newValue: leadId },
-      tx
-    );
-    return created;
-  });
+  } catch (err) {
+    if (err instanceof Error && err.message === "LEAD_ALREADY_CONVERTED") {
+      const fresh = await prisma.lead.findUnique({ where: { id: leadId }, select: { convertedClientId: true } });
+      if (fresh?.convertedClientId) {
+        return { ok: true, clientId: fresh.convertedClientId };
+      }
+    }
+    throw err;
+  }
 
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);

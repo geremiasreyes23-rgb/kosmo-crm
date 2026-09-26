@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireUser, canViewAll, hasPermission } from "@/lib/auth";
 import { assertRelatedOwnership } from "@/lib/relatedRecords";
 import { logAudit } from "@/lib/audit";
-import type { SaleMethod } from "@prisma/client";
+import { Prisma, type SaleMethod } from "@prisma/client";
 
 export interface SaleActionResult {
   ok: boolean;
@@ -119,6 +119,13 @@ export async function moveSaleStageAction(saleId: string, newStageId: string): P
     ? await prisma.policy.findUnique({ where: { saleId } })
     : null;
 
+  // Fase 15 (auditoría de seguridad) — existingPolicy se leyó ANTES de esta
+  // transacción; dos "mover a Ganada" concurrentes para la misma venta
+  // podían pasar ambos ese check y chocar contra el índice único de
+  // Policy.saleId dentro de la transacción, reventando con un error crudo
+  // de Prisma. Se atrapa acá y se responde con un mensaje claro — la
+  // segunda solicitud simplemente llegó tarde, no hay nada que corregir.
+  try {
   await prisma.$transaction(async (tx) => {
     await tx.sale.update({ where: { id: saleId }, data: { stageId: newStageId } });
     await tx.pipelineHistory.create({
@@ -170,6 +177,12 @@ export async function moveSaleStageAction(saleId: string, newStageId: string): P
       );
     }
   });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return { ok: false, error: "Esta venta ya tiene una póliza generada — actualiza la página e inténtalo de nuevo." };
+    }
+    throw err;
+  }
 
   revalidatePath("/sales");
   revalidatePath("/policies");

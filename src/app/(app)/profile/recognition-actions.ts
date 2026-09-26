@@ -31,6 +31,12 @@ export async function sendRecognitionAction(
   if (!VALID_TYPES.includes(type)) {
     return { ok: false, error: "Tipo de reconocimiento inválido." };
   }
+  // Fase 15 (auditoría de seguridad) — la UI deshabilita el botón en "Mi
+  // perfil", pero la Server Action en sí no lo impedía (se podía invocar
+  // directo con el propio id). Nadie debería poder auto-reconocerse.
+  if (toUserId === user.id) {
+    return { ok: false, error: "No puedes enviarte un reconocimiento a ti mismo." };
+  }
   const target = await prisma.user.findUnique({ where: { id: toUserId }, select: { id: true } });
   if (!target) {
     return { ok: false, error: "El usuario no existe." };
