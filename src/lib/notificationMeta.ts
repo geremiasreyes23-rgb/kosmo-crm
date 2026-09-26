@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Bell,
   ClipboardCheck,
+  FileClock,
   type LucideIcon,
 } from "lucide-react";
 import type { NotificationVM } from "@/types";
@@ -25,9 +26,9 @@ import type { NotificationVM } from "@/types";
  * (ToastNotificationProvider), para no mantener dos mapas de íconos
  * duplicados y desincronizados.
  *
- * Los primeros 6 tipos (internal_mail...turning_65) ya se generan solos
- * hoy (ver messages/actions.ts, mail/actions.ts y notificationScheduler.ts).
- * El resto todavía no tiene un disparador en el backend — están acá para
+ * Los tipos internal_mail...turning_65 y documentation_pending ya se
+ * generan solos hoy (ver messages/actions.ts, mail/actions.ts y
+ * notificationScheduler.ts). El resto todavía no tiene un disparador en el backend — están acá para
  * que el sistema de notificaciones emergentes quede listo para usarlos en
  * cuanto se conecten (ver el pedido de "sistema reutilizable" del CRM), sin
  * inventar datos ni fabricar eventos que no existen todavía.
@@ -58,6 +59,7 @@ export const NOTIFICATION_TYPE_META: Record<string, NotificationTypeMeta> = {
   system_alert: { icon: AlertTriangle, accent: "#e34948" },
   daily_report_submitted: { icon: ListChecks, accent: "#e87ba4" },
   daily_report_reviewed: { icon: ClipboardCheck, accent: "#e87ba4" },
+  documentation_pending: { icon: FileClock, accent: "#eda100" },
 };
 
 const DEFAULT_META: NotificationTypeMeta = { icon: Bell, accent: "#898781" };

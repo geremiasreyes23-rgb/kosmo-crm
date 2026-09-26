@@ -27,6 +27,8 @@ const SCAN_INTERVAL_MS = 5 * 60 * 1000; // cada 5 minutos
 const FIRST_SCAN_DELAY_MS = 10 * 1000; // el primer scan no espera el intervalo completo
 const UPCOMING_WINDOW_MS = 24 * 60 * 60 * 1000; // "por vencer" / "próxima" = dentro de 24hs
 const TURNING_65_WINDOW_DAYS = 30;
+const DOC_PENDING_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000; // 3 días parado en "Documentación pendiente"
+const DOC_PENDING_STAGE_NAME = "Documentación pendiente";
 
 function toVM(row: {
   id: string;
@@ -131,6 +133,49 @@ async function scanAppointments(now: Date) {
   }
 }
 
+async function scanDocumentationPending(now: Date) {
+  const threshold = new Date(now.getTime() - DOC_PENDING_THRESHOLD_MS);
+
+  const leads = await prisma.lead.findMany({
+    where: { stage: { name: DOC_PENDING_STAGE_NAME } },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      stageId: true,
+      createdAt: true,
+      agent: { select: { user: { select: { id: true } } } },
+    },
+  });
+
+  for (const l of leads) {
+    if (!l.agent?.user) continue; // sin agente vinculado a un User, no hay a quién avisarle
+
+    // Momento en que el lead entró a "Documentación pendiente" — el último
+    // registro de PipelineHistory con toStageId = etapa actual (todo cambio
+    // de etapa queda trazado ahí, ver leads/actions.ts). Si no hay historial
+    // (lead creado directamente en esa etapa), se usa su fecha de creación.
+    const lastChange = await prisma.pipelineHistory.findFirst({
+      where: { entityType: "LEAD", entityId: l.id, toStageId: l.stageId },
+      orderBy: { changedAt: "desc" },
+      select: { changedAt: true },
+    });
+    const enteredAt = lastChange?.changedAt ?? l.createdAt;
+    if (enteredAt > threshold) continue; // todavía no cumple el umbral de espera
+
+    const daysWaiting = Math.max(1, Math.floor((now.getTime() - enteredAt.getTime()) / (24 * 60 * 60 * 1000)));
+
+    await createIfMissing({
+      userId: l.agent.user.id,
+      type: "documentation_pending",
+      title: "Documentación pendiente",
+      message: `${l.firstName} ${l.lastName} lleva ${daysWaiting} día(s) esperando documentación`,
+      relatedEntityType: "Lead",
+      relatedEntityId: l.id,
+    });
+  }
+}
+
 async function scanTurning65(now: Date) {
   const clients = await prisma.client.findMany({
     where: { dob: { not: null } },
@@ -167,6 +212,7 @@ export async function scanAndGenerateNotifications() {
     await scanTasks(now);
     await scanAppointments(now);
     await scanTurning65(now);
+    await scanDocumentationPending(now);
   } catch (err) {
     // El scheduler nunca debe tirar abajo el server por un error de un
     // scan puntual — se loguea y se reintenta en el próximo ciclo.

@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { HTMLAttributes } from "react";
 
-type BadgeStatus = "good" | "warning" | "serious" | "critical" | "info" | "neutral";
+export type BadgeStatus = "good" | "warning" | "serious" | "critical" | "info" | "neutral";
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   status?: BadgeStatus;

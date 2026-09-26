@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { createSession, setSessionCookie, verifyPassword } from "@/lib/auth";
 import { parseInternalAddress } from "@/lib/mail/config";
+import { checkLoginRateLimit, recordFailedLoginAttempt, resetLoginRateLimit } from "@/lib/loginRateLimit";
 
 export type LoginResult =
   | { ok: false; error: string }
@@ -37,10 +38,32 @@ async function resolveLoginUser(identifier: string) {
   return prisma.user.findUnique({ where: { email: identifier } });
 }
 
+/** IP del cliente a partir de los headers que pone el proxy — Railway (y
+ * cualquier proxy estándar) agrega `x-forwarded-for` con la cadena de IPs,
+ * la primera es la del cliente real. Sin proxy (dev local) no hay header,
+ * así que se cae a un valor fijo — sigue sirviendo para frenar fuerza bruta
+ * local, solo que ahí todos los intentos comparten un mismo balde. */
+async function clientIp(): Promise<string> {
+  const h = await headers();
+  const forwarded = h.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return h.get("x-real-ip") ?? "local";
+}
+
 export async function loginAction(email: string, password: string): Promise<LoginResult> {
   const normalizedEmail = email.trim().toLowerCase();
   if (!normalizedEmail || !password) {
     return { ok: false, error: "Ingresa tu correo y contraseña." };
+  }
+
+  const ip = await clientIp();
+  const rateLimit = checkLoginRateLimit(ip, normalizedEmail);
+  if (!rateLimit.allowed) {
+    const minutes = Math.ceil((rateLimit.retryAfterSeconds ?? 0) / 60);
+    return {
+      ok: false,
+      error: `Demasiados intentos. Espera ${minutes} ${minutes === 1 ? "minuto" : "minutos"} antes de volver a intentarlo.`,
+    };
   }
 
   const user = await resolveLoginUser(normalizedEmail);
@@ -48,13 +71,17 @@ export async function loginAction(email: string, password: string): Promise<Logi
   // Mensaje genérico a propósito tanto si el correo no existe como si el
   // usuario está desactivado — no revelamos cuál de las dos cosas pasó.
   if (!user || user.status !== "ACTIVE") {
+    recordFailedLoginAttempt(ip, normalizedEmail);
     return { ok: false, error: "Correo o contraseña incorrectos." };
   }
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
+    recordFailedLoginAttempt(ip, normalizedEmail);
     return { ok: false, error: "Correo o contraseña incorrectos." };
   }
+
+  resetLoginRateLimit(ip, normalizedEmail);
 
   const userAgent = (await headers()).get("user-agent") ?? undefined;
   const token = await createSession(user.id, userAgent);

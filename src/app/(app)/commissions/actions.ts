@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser, canViewAll, hasPermission } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 import type { CommissionStatus } from "@/types";
 
 export interface CommissionActionResult {
@@ -38,6 +39,15 @@ export async function updateCommissionStatusAction(
       status,
       agentPaymentDate: status === "PAID" && !commission.agentPaymentDate ? new Date() : commission.agentPaymentDate,
     },
+  });
+  await logAudit({
+    userId: user.id,
+    action: "COMMISSION_CHANGE",
+    entityType: "Commission",
+    entityId: commissionId,
+    fieldName: "status",
+    oldValue: commission.status,
+    newValue: status,
   });
 
   revalidatePath("/commissions");

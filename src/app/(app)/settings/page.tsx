@@ -11,6 +11,8 @@ import { CustomFieldsPanel, type CustomFieldRow } from "@/components/settings/Cu
 import { CommissionRatesPanel } from "@/components/settings/CommissionRatesPanel";
 import { MailSettingsPanel } from "@/components/settings/MailSettingsPanel";
 import { getMailAdminOverview } from "./mail-settings-actions";
+import { getAuditLogEntries } from "./audit-data";
+import { AuditLogPanel } from "@/components/settings/AuditLogPanel";
 import type { CommissionRateVM } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -31,8 +33,9 @@ export default async function SettingsPage() {
   const canManageFields = hasPermission(currentUser, "settings", "create");
   const canManageMail = hasPermission(currentUser, "mail", "admin");
   const canManageRates = hasPermission(currentUser, "commissions", "admin");
+  const canViewAudit = hasPermission(currentUser, "audit", "view");
 
-  const [dbRoles, dbUsers, dbCustomFields, dbInsuranceLines, mailAdminOverview, dbCommissionRates, dbAgents] =
+  const [dbRoles, dbUsers, dbCustomFields, dbInsuranceLines, mailAdminOverview, dbCommissionRates, dbAgents, auditEntries] =
     await Promise.all([
       prisma.role.findMany({ orderBy: { createdAt: "asc" } }),
       isManager
@@ -52,6 +55,7 @@ export default async function SettingsPage() {
         orderBy: [{ effectiveFrom: "desc" }],
       }),
       prisma.agent.findMany({ where: { status: "ACTIVE" }, orderBy: { firstName: "asc" } }),
+      canViewAudit ? getAuditLogEntries() : Promise.resolve([]),
     ]);
 
   const roleOptions = dbRoles.map((r) => ({ id: r.id, name: r.name }));
@@ -194,6 +198,15 @@ export default async function SettingsPage() {
               { id: "carriers", label: "Carriers", content: <p className="text-sm text-[var(--ink-muted)]">Catálogo de carriers por línea de negocio.</p> },
               { id: "sources", label: "Orígenes de leads", content: <p className="text-sm text-[var(--ink-muted)]">Base de datos, Referido, Evento, Llamada entrante, Otro.</p> },
               { id: "notifications", label: "Notificaciones", content: <p className="text-sm text-[var(--ink-muted)]">Configuración de alertas: tareas vencidas, Turning 65, chargebacks, etc.</p> },
+              ...(canViewAudit
+                ? [
+                    {
+                      id: "audit",
+                      label: "Auditoría",
+                      content: <AuditLogPanel entries={auditEntries} />,
+                    },
+                  ]
+                : []),
             ]}
           />
         </CardContent>

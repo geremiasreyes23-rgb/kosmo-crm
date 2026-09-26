@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser, hashPassword, generateTempPassword } from "@/lib/auth";
 import { ensureMailboxForUser } from "@/lib/mail/mailbox";
+import { logAudit } from "@/lib/audit";
 
 const MANAGER_ROLES = ["Super Admin", "Admin"];
 
@@ -37,8 +38,9 @@ export async function createUserAction(input: {
   email: string;
   roleId: string;
 }): Promise<UserActionResult> {
-  const { error } = await requireUserManager();
+  const { current, error } = await requireUserManager();
   if (error) return { ok: false, error };
+  if (!current) return { ok: false, error: "No autorizado." };
 
   const firstName = input.firstName.trim();
   const lastName = input.lastName.trim();
@@ -83,6 +85,7 @@ export async function createUserAction(input: {
   // la transacción de arriba porque ensureMailboxForUser abre la suya
   // propia y depende de que el usuario ya exista.
   await ensureMailboxForUser(newUser);
+  await logAudit({ userId: current.id, action: "CREATE", entityType: "User", entityId: newUser.id, newValue: email });
 
   revalidatePath("/settings");
   return { ok: true, tempPassword };
@@ -92,8 +95,9 @@ export async function updateUserAction(
   userId: string,
   input: { firstName: string; lastName: string; email: string; roleId: string }
 ): Promise<UserActionResult> {
-  const { error } = await requireUserManager();
+  const { current, error } = await requireUserManager();
   if (error) return { ok: false, error };
+  if (!current) return { ok: false, error: "No autorizado." };
 
   const firstName = input.firstName.trim();
   const lastName = input.lastName.trim();
@@ -108,6 +112,8 @@ export async function updateUserAction(
     return { ok: false, error: "Ese correo ya lo usa otro usuario." };
   }
 
+  const before = await prisma.user.findUnique({ where: { id: userId }, select: { roleId: true } });
+
   const updated = await prisma.user.update({
     where: { id: userId },
     data: { firstName, lastName, email, roleId: input.roleId },
@@ -119,6 +125,18 @@ export async function updateUserAction(
     await prisma.agent.update({
       where: { id: updated.agentId },
       data: { firstName, lastName, email },
+    });
+  }
+  await logAudit({ userId: current.id, action: "UPDATE", entityType: "User", entityId: userId, fieldName: "profile" });
+  if (before && before.roleId !== input.roleId) {
+    await logAudit({
+      userId: current.id,
+      action: "UPDATE",
+      entityType: "User",
+      entityId: userId,
+      fieldName: "roleId",
+      oldValue: before.roleId,
+      newValue: input.roleId,
     });
   }
 
@@ -157,6 +175,14 @@ export async function setUserStatusAction(
       data: { status: status === "ACTIVE" ? "ACTIVE" : "INACTIVE" },
     });
   }
+  await logAudit({
+    userId: current.id,
+    action: "UPDATE",
+    entityType: "User",
+    entityId: userId,
+    fieldName: "status",
+    newValue: status,
+  });
 
   // Correo interno: al desactivar un usuario, su buzón se marca DISABLED en
   // vez de borrarse — conserva el historial (retención) y evita reasignar
@@ -174,8 +200,9 @@ export async function setUserStatusAction(
 }
 
 export async function resetPasswordAction(userId: string): Promise<UserActionResult> {
-  const { error } = await requireUserManager();
+  const { current, error } = await requireUserManager();
   if (error) return { ok: false, error };
+  if (!current) return { ok: false, error: "No autorizado." };
 
   const tempPassword = generateTempPassword();
   const passwordHash = await hashPassword(tempPassword);
@@ -186,6 +213,7 @@ export async function resetPasswordAction(userId: string): Promise<UserActionRes
   });
   // Fuerza a re-loguearse con la contraseña nueva.
   await prisma.session.deleteMany({ where: { userId } });
+  await logAudit({ userId: current.id, action: "UPDATE", entityType: "User", entityId: userId, fieldName: "passwordReset" });
 
   revalidatePath("/settings");
   return { ok: true, tempPassword };
@@ -220,6 +248,10 @@ export async function deleteUserAction(userId: string): Promise<UserActionResult
         "No se puede eliminar: este usuario tiene historial en el sistema (leads, ventas, auditoría, etc.). Desactívalo en su lugar para revocar su acceso.",
     };
   }
+  // El registro de auditoría queda con userId = quien borró (no el usuario
+  // borrado, que ya no existe) — entityId conserva el id del usuario
+  // eliminado para que el rastro siga siendo consultable.
+  await logAudit({ userId: current.id, action: "DELETE", entityType: "User", entityId: userId });
 
   revalidatePath("/settings");
   return { ok: true };

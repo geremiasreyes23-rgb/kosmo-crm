@@ -55,6 +55,12 @@ const EXTRA_PERMISSIONS: [string, string][] = [
   // Admin/Super Admin (vía allKeys) más abajo, porque un supervisor
   // también revisa reportes de su equipo.
   ["activities", "review"],
+  // Fase 13 (Auditoría + Seguridad) — ver el registro de auditoría
+  // (Configuración → Auditoría). A propósito NO se le da a Manager: un
+  // supervisor de equipo revisa reportes y datos de negocio, pero el
+  // registro de auditoría (quién cambió qué en todo el sistema, incluidos
+  // otros usuarios) queda reservado a Admin/Super Admin vía allKeys.
+  ["audit", "view"],
 ];
 
 function generateTempPassword(): string {

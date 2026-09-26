@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser, canViewAll, hasPermission } from "@/lib/auth";
 import { upsertSensitiveField, revealSensitiveField } from "@/lib/sensitiveData";
+import { logAudit } from "@/lib/audit";
 
 export interface ClientActionResult {
   ok: boolean;
@@ -62,6 +63,8 @@ export async function createClientAction(input: CreateClientInput): Promise<Clie
     },
   });
 
+  await logAudit({ userId: user.id, action: "CREATE", entityType: "Client", entityId: client.id });
+
   revalidatePath("/clients");
   return { ok: true, id: client.id };
 }
@@ -107,6 +110,16 @@ export async function setSensitiveFieldAction(
   }
 
   const field = await upsertSensitiveField(clientId, key, plainValue);
+  // Nunca se registra el valor en sí — solo que el campo fue capturado o
+  // reemplazado, igual criterio que revealSensitiveField en sensitiveData.ts
+  // para la lectura (SensitiveDataAccessLog), pero del lado de la escritura.
+  await logAudit({
+    userId: user.id,
+    action: "SENSITIVE_ACCESS",
+    entityType: "SensitiveField",
+    entityId: field.id,
+    fieldName: key,
+  });
 
   revalidatePath(`/clients/${clientId}`);
   return { ok: true, id: field.id };

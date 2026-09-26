@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser, canViewAll, hasPermission } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 
 export interface LeadActionResult {
   ok: boolean;
@@ -81,6 +82,7 @@ export async function createLeadAction(input: CreateLeadInput): Promise<LeadActi
   await prisma.pipelineHistory.create({
     data: { entityType: "LEAD", entityId: lead.id, toStageId: stage.id, changedById: user.id },
   });
+  await logAudit({ userId: user.id, action: "CREATE", entityType: "Lead", entityId: lead.id });
 
   revalidatePath("/leads");
   return { ok: true, id: lead.id };
@@ -117,6 +119,17 @@ export async function moveLeadStageAction(leadId: string, newStageId: string): P
         fromStageId: lead.stageId,
         toStageId: newStageId,
         changedById: user.id,
+      },
+    }),
+    prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: "STAGE_CHANGE",
+        entityType: "Lead",
+        entityId: leadId,
+        fieldName: "stageId",
+        oldValue: lead.stageId,
+        newValue: newStageId,
       },
     }),
   ]);
@@ -180,6 +193,10 @@ export async function convertLeadToClientAction(leadId: string): Promise<Convert
       where: { id: leadId },
       data: { convertedClientId: created.id, convertedAt: new Date() },
     });
+    await logAudit(
+      { userId: user.id, action: "CREATE", entityType: "Client", entityId: created.id, fieldName: "convertedFromLeadId", newValue: leadId },
+      tx
+    );
     return created;
   });
 

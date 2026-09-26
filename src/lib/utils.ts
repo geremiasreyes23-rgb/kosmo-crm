@@ -156,6 +156,16 @@ export function avatarColorFromId(id: string): string {
   return AVATAR_COLOR_PALETTE[hash % AVATAR_COLOR_PALETTE.length];
 }
 
+/** Tamaño legible a partir de bytes — usado para adjuntos guardados como
+ * data URL (Documentos, Correo interno), donde no se persiste el tamaño
+ * real y se aproxima a partir del largo del base64 (ver formatBytes en
+ * los componentes que lo llaman con Math.round((dataUrl.length * 3) / 4)). */
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 /** Días restantes (o transcurridos, negativo) hasta una fecha ISO. */
 export function daysUntil(iso: string): number {
   const target = new Date(iso);

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser, canViewAll, hasPermission } from "@/lib/auth";
 import { assertRelatedOwnership } from "@/lib/relatedRecords";
+import { logAudit } from "@/lib/audit";
 import type { SaleMethod } from "@prisma/client";
 
 export interface SaleActionResult {
@@ -77,6 +78,7 @@ export async function createSaleAction(input: CreateSaleInput): Promise<SaleActi
   await prisma.pipelineHistory.create({
     data: { entityType: "SALE", entityId: sale.id, toStageId: stage.id, changedById: user.id },
   });
+  await logAudit({ userId: user.id, action: "CREATE", entityType: "Sale", entityId: sale.id });
 
   revalidatePath("/sales");
   return { ok: true, id: sale.id };
@@ -128,8 +130,20 @@ export async function moveSaleStageAction(saleId: string, newStageId: string): P
         changedById: user.id,
       },
     });
+    await logAudit(
+      {
+        userId: user.id,
+        action: "STAGE_CHANGE",
+        entityType: "Sale",
+        entityId: saleId,
+        fieldName: "stageId",
+        oldValue: sale.stageId,
+        newValue: newStageId,
+      },
+      tx
+    );
     if (newStage.isWon && sale.clientId && !existingPolicy) {
-      await tx.policy.create({
+      const createdPolicy = await tx.policy.create({
         data: {
           clientId: sale.clientId,
           insuranceLineId: sale.insuranceLineId!,
@@ -143,6 +157,17 @@ export async function moveSaleStageAction(saleId: string, newStageId: string): P
           saleId: sale.id,
         },
       });
+      await logAudit(
+        {
+          userId: user.id,
+          action: "POLICY_CHANGE",
+          entityType: "Policy",
+          entityId: createdPolicy.id,
+          fieldName: "createdFromSaleId",
+          newValue: sale.id,
+        },
+        tx
+      );
     }
   });
 

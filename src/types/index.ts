@@ -191,6 +191,13 @@ export interface DocumentVM {
   clientId?: string;
   saleId?: string;
   policyId?: string;
+  /** A qué tipo de registro está ligado — para el módulo standalone
+   * /documents, que lista documentos de las 4 entidades a la vez (ver
+   * relatedInfo en documents/data.ts). Ausente solo si el documento quedó
+   * huérfano (su lead/cliente/venta/póliza fue borrado). */
+  relatedType?: "Lead" | "Client" | "Sale" | "Policy";
+  relatedLabel?: string;
+  relatedHref?: string;
 }
 
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";

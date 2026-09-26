@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser, canViewAll, hasPermission } from "@/lib/auth";
 import { generateOrUpdateCommissionForPolicy } from "@/lib/commissions";
+import { logAudit } from "@/lib/audit";
 import type { PolicyStatus } from "@/types";
 
 export interface PolicyActionResult {
@@ -61,6 +62,8 @@ export async function createPolicyAction(input: CreatePolicyInput): Promise<Poli
     },
   });
 
+  await logAudit({ userId: user.id, action: "CREATE", entityType: "Policy", entityId: policy.id });
+
   revalidatePath("/policies");
   revalidatePath(`/clients/${input.clientId}`);
   return { ok: true, id: policy.id };
@@ -95,6 +98,18 @@ export async function updatePolicyStatusAction(
         effectiveDate: status === "ACTIVE" && !policy.effectiveDate ? new Date() : policy.effectiveDate,
       },
     });
+    await logAudit(
+      {
+        userId: user.id,
+        action: "POLICY_CHANGE",
+        entityType: "Policy",
+        entityId: policyId,
+        fieldName: "status",
+        oldValue: policy.status,
+        newValue: status,
+      },
+      tx
+    );
     if (status === "ACTIVE") {
       await generateOrUpdateCommissionForPolicy(tx, policyId);
     }

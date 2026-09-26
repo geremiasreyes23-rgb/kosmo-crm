@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { uploadDocumentAction } from "@/lib/documents/actions";
 import type { DocumentVM } from "@/types";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatBytes } from "@/lib/utils";
 import { FileText, Paperclip } from "lucide-react";
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -15,12 +15,6 @@ function readFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
-}
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 const MAX_DOCUMENT_SIZE_MB = 8;
