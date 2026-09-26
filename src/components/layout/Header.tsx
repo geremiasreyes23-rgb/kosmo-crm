@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Menu, Building2, LogOut, KeyRound, ChevronDown, UserCircle, Loader2, Users, UserPlus, FileCheck2, Building, Palette } from "lucide-react";
+import { Search, Menu, LogOut, KeyRound, ChevronDown, UserCircle, Loader2, Users, UserPlus, FileCheck2, Building, Palette } from "lucide-react";
 import { logoutAction } from "@/app/(app)/logout-action";
 import { ClockWidget } from "./ClockWidget";
 import { ProfileModal } from "@/components/profile/ProfileModal";
@@ -155,9 +155,8 @@ export function Header({
       </div>
 
       <div className="col-start-3 flex items-center gap-4">
-        <div className="hidden items-center gap-2 border-r border-white/15 pr-4 sm:flex">
-          <Building2 className="h-4 w-4 text-white/50" />
-          <span className="text-sm font-medium text-white/80">Alliance Insurance</span>
+        <div className="hidden items-center border-r border-white/15 pr-4 sm:flex">
+          <span className="text-base font-semibold text-white/90">Alliance Insurance</span>
         </div>
         <NotificationBell />
 

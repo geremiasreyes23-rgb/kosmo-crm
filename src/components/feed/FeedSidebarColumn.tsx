@@ -15,6 +15,15 @@ function WidgetLink({ href, label }: { href: string; label: string }) {
 export function FeedSidebarColumn({ data }: { data: FeedSidebarDataVM }) {
   return (
     <div className="space-y-4">
+      {/* Logo de la empresa que usa este KOSMO CRM (pedido explícito: bajar
+          un poco las tarjetas de Menciones/Actividad/Eventos/Archivos para
+          dejarle este espacio arriba). Imagen estática en public/brand/ —
+          mismo patrón que los assets de marca de KOSMO (kosmo-*.png). */}
+      <Card className="flex items-center justify-center p-4">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/lidy-logo.png" alt="Logo de la empresa" className="h-20 w-auto object-contain" />
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-1.5">
