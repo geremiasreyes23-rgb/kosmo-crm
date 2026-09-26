@@ -1,5 +1,6 @@
 import { getSessionUser } from "@/lib/auth";
-import { subscribeMessengerEvents } from "@/lib/messengerEvents";
+import { subscribeMessengerEvents, subscribePresenceEvents } from "@/lib/messengerEvents";
+import { markUserOnline, markUserOffline } from "@/lib/presence";
 
 // Nunca cachear/optimizar esta ruta estáticamente — es un stream que se
 // mantiene abierto mientras dure la pestaña.
@@ -21,6 +22,7 @@ export async function GET() {
 
   const encoder = new TextEncoder();
   let unsubscribe: (() => void) | null = null;
+  let unsubscribePresence: (() => void) | null = null;
   let heartbeat: ReturnType<typeof setInterval> | null = null;
 
   const stream = new ReadableStream({
@@ -39,6 +41,18 @@ export async function GET() {
         }
       });
 
+      // Presencia — a diferencia de arriba, se reenvía a TODOS los
+      // conectados (nadie queda afuera del filtro de participantIds, ver
+      // messengerEvents.ts) para que el punto verde de cualquier persona se
+      // actualice en cualquier pestaña que la tenga en su lista.
+      unsubscribePresence = subscribePresenceEvents((event) => {
+        send(event);
+      });
+
+      // Esta pestaña cuenta como una conexión real de `user` — presencia
+      // de verdad, no "¿tiene una sesión sin vencer?" (ver src/lib/presence.ts).
+      markUserOnline(user.id);
+
       // Mantiene viva la conexión a través de proxies/balanceadores que
       // cortan conexiones inactivas (comentario SSE — el cliente lo ignora).
       heartbeat = setInterval(() => {
@@ -53,7 +67,9 @@ export async function GET() {
     },
     cancel() {
       unsubscribe?.();
+      unsubscribePresence?.();
       if (heartbeat) clearInterval(heartbeat);
+      markUserOffline(user.id);
     },
   });
 

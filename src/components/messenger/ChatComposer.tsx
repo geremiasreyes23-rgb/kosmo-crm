@@ -29,17 +29,12 @@ const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 export function ChatComposer({
   onSend,
   mentionUsers,
-  wallpaper,
 }: {
   onSend: (payload: ComposerSendPayload) => void;
   /** Directorio de la organización — candidatos para el desplegable de
    * "@" (autocompletado de menciones). Si no se pasa, las menciones
    * simplemente no se ofrecen (el texto libre sigue funcionando igual). */
   mentionUsers?: ChatUser[];
-  /** Mismo fondo del chat que ChatPanel (ver ChatWallpaperPicker) — se
-   * repite acá para que la franja de atrás de la barra "flotante" no corte
-   * contra el fondo de los mensajes, sino que se vea continua. */
-  wallpaper?: string | null;
 }) {
   const [text, setText] = useState("");
   const [pending, setPending] = useState<ComposerAttachment[]>([]);
@@ -266,11 +261,11 @@ export function ChatComposer({
 
   return (
     <div
-      className={cn(
-        "relative shrink-0 px-4 pb-4 pt-2 transition-colors",
-        !wallpaper && "kosmo-chat-bg"
-      )}
-      style={wallpaper ? { backgroundColor: wallpaper } : undefined}
+      // El fondo (color elegido o textura por defecto) ya lo pinta el
+      // contenedor padre en ChatPanel.tsx — este div queda transparente
+      // encima, así comparte exactamente el mismo pixel de fondo que el
+      // área de mensajes en vez de decidir su propio color por separado.
+      className="relative shrink-0 px-4 pb-4 pt-2"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

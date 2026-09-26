@@ -72,6 +72,18 @@ export interface MessengerMessagePinnedEvent {
   pinnedAt: string | null;
 }
 
+/** A diferencia de los demás eventos (que solo le interesan a los dos
+ * participantes de una conversación puntual, ver participantIds), la
+ * presencia le interesa a CUALQUIERA que tenga a esa persona en su lista de
+ * conversaciones — como acá "todos con todos" pueden chatear, se difunde a
+ * todas las pestañas conectadas sin filtrar por participantIds (ver
+ * PresenceEvent, sin ese campo a propósito). */
+export interface PresenceEvent {
+  type: "presence";
+  userId: string;
+  online: boolean;
+}
+
 export type MessengerEvent =
   | MessengerMessageEvent
   | MessengerReadEvent
@@ -80,6 +92,7 @@ export type MessengerEvent =
   | MessengerMessagePinnedEvent;
 
 const CHANNEL = "messenger";
+const PRESENCE_CHANNEL = "messenger-presence";
 
 export function publishMessengerEvent(event: MessengerEvent) {
   messengerEvents.emit(CHANNEL, event);
@@ -88,4 +101,13 @@ export function publishMessengerEvent(event: MessengerEvent) {
 export function subscribeMessengerEvents(listener: (event: MessengerEvent) => void): () => void {
   messengerEvents.on(CHANNEL, listener);
   return () => messengerEvents.off(CHANNEL, listener);
+}
+
+export function publishPresenceEvent(event: PresenceEvent) {
+  messengerEvents.emit(PRESENCE_CHANNEL, event);
+}
+
+export function subscribePresenceEvents(listener: (event: PresenceEvent) => void): () => void {
+  messengerEvents.on(PRESENCE_CHANNEL, listener);
+  return () => messengerEvents.off(PRESENCE_CHANNEL, listener);
 }

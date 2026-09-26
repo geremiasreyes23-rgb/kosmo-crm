@@ -73,8 +73,19 @@ export function MessengerProvider({
     return map;
   }, [initialData.currentUser, initialData.users]);
 
+  // Presencia en línea — arranca con el snapshot que trajo el server
+  // (ver getMessengerViewData/presence.ts) y se actualiza en vivo con los
+  // eventos "presence" del SSE (abajo), así el puntito verde de cada
+  // persona refleja si tiene Mensajería abierta AHORA, no si se logueó
+  // en algún momento de las últimas dos semanas.
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(
+    () => new Set(initialData.users.filter((u) => u.status === "ONLINE").map((u) => u.id))
+  );
+
   function getChatUser(id: string): ChatUser {
-    return usersById.get(id) ?? { id, name: "Usuario", role: "", avatarColor: FALLBACK_USER_COLOR, status: "OFFLINE" };
+    const base = usersById.get(id) ?? { id, name: "Usuario", role: "", avatarColor: FALLBACK_USER_COLOR, status: "OFFLINE" as const };
+    if (id === currentUserId) return base; // uno mismo siempre "en línea" mientras ve la app
+    return { ...base, status: onlineUserIds.has(id) ? "ONLINE" : "OFFLINE" };
   }
 
   function patchMessage(conversationId: string, messageId: string, patch: Partial<ChatMessage>) {
@@ -182,6 +193,17 @@ export function MessengerProvider({
           attachments: undefined,
           pinned: undefined,
           deletedAt: payload.deletedAt as string,
+        });
+      } else if (payload.type === "presence") {
+        const userId = payload.userId as string;
+        const online = payload.online as boolean;
+        setOnlineUserIds((prev) => {
+          const has = prev.has(userId);
+          if (online === has) return prev; // ya estaba en el estado correcto
+          const next = new Set(prev);
+          if (online) next.add(userId);
+          else next.delete(userId);
+          return next;
         });
       } else if (payload.type === "message-pinned") {
         const conversationId = payload.conversationId as string;

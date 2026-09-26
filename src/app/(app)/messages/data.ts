@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { avatarColorFromId } from "@/lib/utils";
 import type { SessionUser } from "@/lib/auth";
+import { getOnlineUserIds } from "@/lib/presence";
 import type { ChatConversation, ChatMessage, ChatUser } from "@/types";
 
 export interface MessengerInitialData {
@@ -42,7 +43,7 @@ function toChatUser(row: {
  * son filas reales compartidas entre todos los que entran a la plataforma.
  */
 export async function getMessengerViewData(sessionUser: SessionUser): Promise<MessengerInitialData> {
-  const [allUsers, myConversations, activeSessions] = await Promise.all([
+  const [allUsers, myConversations] = await Promise.all([
     prisma.user.findMany({
       where: { status: "ACTIVE" },
       include: { role: true },
@@ -55,14 +56,14 @@ export async function getMessengerViewData(sessionUser: SessionUser): Promise<Me
         reads: true,
       },
     }),
-    prisma.session.findMany({
-      where: { expiresAt: { gt: new Date() } },
-      select: { userId: true },
-      distinct: ["userId"],
-    }),
   ]);
 
-  const onlineIds = new Set(activeSessions.map((s) => s.userId));
+  // "En línea" = tiene una conexión de Mensajería realmente abierta ahora
+  // (ver src/lib/presence.ts) — antes esto salía de `prisma.session`
+  // (¿tiene una sesión sin vencer, de hasta 14 días?), así que cualquiera
+  // que se hubiera logueado esa misma quincena aparecía en línea para
+  // siempre, estuviera conectado o no.
+  const onlineIds = getOnlineUserIds();
   const meRow = allUsers.find((u) => u.id === sessionUser.id);
 
   const users: ChatUser[] = allUsers

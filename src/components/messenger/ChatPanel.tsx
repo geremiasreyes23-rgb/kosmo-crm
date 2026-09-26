@@ -192,64 +192,72 @@ export function ChatPanel({
         </button>
       )}
 
+      {/* Envuelve el área de mensajes Y el compositor en un único
+          contenedor que pinta el fondo UNA sola vez — antes cada uno de los
+          dos decidía por su cuenta si aplicar el color elegido o el fondo
+          por defecto (la misma lógica condicional repetida en dos lugares
+          distintos), y esos dos "pinceles" independientes podían quedar
+          desincronizados entre sí (ver el bug reportado: mensajes en rosa,
+          compositor en menta). Ahora hay un solo lugar que pinta el fondo
+          — este div — y tanto el área de mensajes como ChatComposer quedan
+          transparentes encima, así que es imposible que muestren colores
+          distintos: literalmente comparten el mismo pixel de fondo. */}
       <div
-        ref={scrollRef}
-        className={cn(
-          "min-h-0 flex-1 overflow-y-auto p-4 transition-colors duration-200",
-          !wallpaper && "kosmo-chat-bg"
-        )}
+        className={cn("flex min-h-0 flex-1 flex-col transition-colors duration-200", !wallpaper && "kosmo-chat-bg")}
         style={wallpaper ? { backgroundColor: wallpaper } : undefined}
       >
-        {/* Columna centrada con márgenes a los lados — sin esto, en una
-            ventana ancha los mensajes se estiraban de punta a punta del
-            panel y se perdía la sensación de "conversación", como en
-            WhatsApp/Telegram de escritorio donde el chat siempre queda en
-            una columna central aunque la ventana sea muy ancha. */}
-        <div className="mx-auto w-full max-w-4xl space-y-3">
-          {messages.length === 0 && (
-            <p className="mt-10 text-center text-sm text-[var(--ink-muted)]">
-              Todavía no hay mensajes. Envía el primero 👋
-            </p>
-          )}
-          {messages.map((message) => {
-            const dayLabel = formatDayLabel(message.sentAt);
-            const showDaySeparator = dayLabel !== lastDay;
-            lastDay = dayLabel;
-            return (
-              <div key={message.id} data-message-id={message.id}>
-                {showDaySeparator && (
-                  <div className="my-3 flex items-center justify-center">
-                    <span className="rounded-full bg-[var(--surface-sunken)] px-3 py-1 text-[11px] font-medium text-[var(--ink-muted)]">
-                      {dayLabel}
-                    </span>
-                  </div>
-                )}
-                <MessageBubble
-                  message={message}
-                  isOwn={message.senderId === currentUserId}
-                  onImageClick={onImageClick}
-                  onContextMenu={handleContextMenu}
-                  isEditing={editingId === message.id}
-                  onSubmitEdit={(id, text) => {
-                    onEditMessage(id, text);
-                    setEditingId(null);
-                  }}
-                  onCancelEdit={() => setEditingId(null)}
-                  mentionUsers={users}
-                  onMentionClick={onOpenProfile}
-                />
-              </div>
-            );
-          })}
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-4">
+          {/* Columna centrada con márgenes a los lados — sin esto, en una
+              ventana ancha los mensajes se estiraban de punta a punta del
+              panel y se perdía la sensación de "conversación", como en
+              WhatsApp/Telegram de escritorio donde el chat siempre queda en
+              una columna central aunque la ventana sea muy ancha. */}
+          <div className="mx-auto w-full max-w-4xl space-y-3">
+            {messages.length === 0 && (
+              <p className="mt-10 text-center text-sm text-[var(--ink-muted)]">
+                Todavía no hay mensajes. Envía el primero 👋
+              </p>
+            )}
+            {messages.map((message) => {
+              const dayLabel = formatDayLabel(message.sentAt);
+              const showDaySeparator = dayLabel !== lastDay;
+              lastDay = dayLabel;
+              return (
+                <div key={message.id} data-message-id={message.id}>
+                  {showDaySeparator && (
+                    <div className="my-3 flex items-center justify-center">
+                      <span className="rounded-full bg-[var(--surface-sunken)] px-3 py-1 text-[11px] font-medium text-[var(--ink-muted)]">
+                        {dayLabel}
+                      </span>
+                    </div>
+                  )}
+                  <MessageBubble
+                    message={message}
+                    isOwn={message.senderId === currentUserId}
+                    onImageClick={onImageClick}
+                    onContextMenu={handleContextMenu}
+                    isEditing={editingId === message.id}
+                    onSubmitEdit={(id, text) => {
+                      onEditMessage(id, text);
+                      setEditingId(null);
+                    }}
+                    onCancelEdit={() => setEditingId(null)}
+                    mentionUsers={users}
+                    onMentionClick={onOpenProfile}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      {sendError && (
-        <p className="shrink-0 border-t border-red-400/30 bg-red-500/10 px-4 py-2 text-xs text-[var(--status-critical)]">
-          {sendError}
-        </p>
-      )}
-      <ChatComposer onSend={onSend} mentionUsers={users} wallpaper={wallpaper} />
+        {sendError && (
+          <p className="shrink-0 border-t border-red-400/30 bg-red-500/10 px-4 py-2 text-xs text-[var(--status-critical)]">
+            {sendError}
+          </p>
+        )}
+        <ChatComposer onSend={onSend} mentionUsers={users} />
+      </div>
 
       {contextMenu && (
         <MessageContextMenu
