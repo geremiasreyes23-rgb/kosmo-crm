@@ -155,6 +155,13 @@ export function Sidebar({ showReports }: { showReports: boolean }) {
                   !expanded && "justify-center px-0",
                   active ? "bg-white/10 text-white" : "text-[#a4aecb] hover:bg-white/5 hover:text-white"
                 )}
+                // Barra de acento a la izquierda del item activo — el único
+                // detalle del Sidebar que sí sigue al tema elegido
+                // (Avatar → Tema del sistema, var(--brand-500)). El resto
+                // del resaltado activo (bg-white/10) queda igual que
+                // siempre: ya se adapta solo, visualmente, al degradado de
+                // fondo de cada tema sin necesitar más cambios acá.
+                style={active ? { boxShadow: "inset 3px 0 0 0 var(--brand-500)" } : undefined}
               >
                 <span
                   className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md"

@@ -197,3 +197,167 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+
+/* ————————————————————————————————————————————————————————————
+   Sistema de temas visuales personalizables (Avatar → Tema del sistema)
+   ————————————————————————————————————————————————————————————
+   4 temas que el usuario elige y que se guardan por cuenta (User.
+   themePreference). Deliberadamente solo redefinen ACENTOS — nunca
+   --surface-*, --ink-* ni --border-*, así el resto de la interfaz sigue
+   blanco/gris muy claro/neutro sin importar el tema elegido (regla
+   explícita del pedido: "la personalización debe cambiar la identidad
+   cromática, no rediseñar la aplicación").
+
+   --brand-* ya era, desde Fase 1, la única paleta de acento que consume
+   toda la app (botones primarios, links, foco, badges, tabs activos,
+   selección en Kanban, iniciales del avatar, etc. — ver Button.tsx,
+   Tabs.tsx, Kanban.tsx, Field.tsx, y decenas de vistas de módulo). Por
+   eso alcanza con redefinir --brand-* por tema: CADA componente
+   existente se retemiza solo, sin tocar un solo archivo de componente —
+   tal como pide el punto 18 ("sin tener que reconstruir el sistema").
+
+   --theme-chrome-gradient/--theme-chrome-bg son nuevos: el degradado del
+   Header+Sidebar (antes un string fijo en chromeGradient.ts) ahora lee
+   estas variables, así ese "chrome" morado/negro también cambia de tono
+   por tema sin dejar de ser el mismo panel oscuro elegante de siempre.
+
+   Este bloque se agrega AL FINAL del archivo a propósito: con la misma
+   especificidad que el bloque "@media (prefers-color-scheme: dark)" de
+   arriba, gana el que aparece último en el código — así el tema elegido
+   por el usuario manda incluso si el sistema operativo está en modo
+   oscuro (el modo oscuro automático es una función previa, independiente
+   de este sistema de temas, y no se modificó).
+
+   [data-color-theme] va en <html> (ver ThemeProvider.tsx) — así cualquier
+   contenido montado con un portal a document.body (modales, Drawer) queda
+   igual dentro del árbol que hereda estas variables.
+   ———————————————————————————————————————————————————————————— */
+
+:root,
+:root[data-color-theme="aurora-violet"] {
+  --brand-50: #f5f3ff;
+  --brand-100: #ede9fe;
+  --brand-300: #c4b5fd;
+  --brand-500: #8b5cf6;
+  --brand-600: #7c3aed;
+  --brand-700: #6d28d9;
+
+  --theme-primary: var(--brand-500);
+  --theme-primary-hover: var(--brand-600);
+  --theme-secondary: var(--brand-300);
+  --theme-accent: var(--brand-500);
+  --theme-button: var(--brand-500);
+  --theme-button-hover: var(--brand-600);
+  --theme-link: var(--brand-600);
+  --theme-focus: var(--brand-500);
+  --theme-badge: var(--brand-500);
+
+  --theme-chrome-gradient: linear-gradient(
+    160deg,
+    #3b2172 0%,
+    #241454 22%,
+    #140b34 45%,
+    #0a0618 68%,
+    #05040c 100%
+  );
+  --theme-chrome-bg: #05040c;
+}
+
+:root[data-color-theme="nebula-blue"] {
+  --brand-50: #eaf2fc;
+  --brand-100: #cde2fb;
+  --brand-300: #6da7ec;
+  --brand-500: #2a78d6;
+  --brand-600: #1c5cab;
+  --brand-700: #184f95;
+
+  --theme-primary: var(--brand-500);
+  --theme-primary-hover: var(--brand-600);
+  --theme-secondary: var(--brand-300);
+  --theme-accent: var(--brand-500);
+  --theme-button: var(--brand-500);
+  --theme-button-hover: var(--brand-600);
+  --theme-link: var(--brand-600);
+  --theme-focus: var(--brand-500);
+  --theme-badge: var(--brand-500);
+
+  --theme-chrome-gradient: linear-gradient(
+    160deg,
+    #142a72 0%,
+    #101c54 22%,
+    #0a1334 45%,
+    #060a1e 68%,
+    #04060f 100%
+  );
+  --theme-chrome-bg: #04060f;
+}
+
+:root[data-color-theme="cosmic-rose"] {
+  --brand-50: #fdf2f9;
+  --brand-100: #fbdcef;
+  --brand-300: #e7b3d8;
+  --brand-500: #c2569f;
+  --brand-600: #a8408a;
+  --brand-700: #8a2f71;
+
+  --theme-primary: var(--brand-500);
+  --theme-primary-hover: var(--brand-600);
+  --theme-secondary: var(--brand-300);
+  --theme-accent: var(--brand-500);
+  --theme-button: var(--brand-500);
+  --theme-button-hover: var(--brand-600);
+  --theme-link: var(--brand-600);
+  --theme-focus: var(--brand-500);
+  --theme-badge: var(--brand-500);
+
+  --theme-chrome-gradient: linear-gradient(
+    160deg,
+    #5c2350 0%,
+    #3a1740 22%,
+    #220f34 45%,
+    #120a1e 68%,
+    #08060f 100%
+  );
+  --theme-chrome-bg: #08060f;
+}
+
+:root[data-color-theme="galaxy-cyan"] {
+  --brand-50: #ecfeff;
+  --brand-100: #cffafe;
+  --brand-300: #67e8f9;
+  --brand-500: #06b6d4;
+  --brand-600: #0891b2;
+  --brand-700: #0e7490;
+
+  --theme-primary: var(--brand-500);
+  --theme-primary-hover: var(--brand-600);
+  --theme-secondary: var(--brand-300);
+  --theme-accent: var(--brand-500);
+  --theme-button: var(--brand-500);
+  --theme-button-hover: var(--brand-600);
+  --theme-link: var(--brand-600);
+  --theme-focus: var(--brand-500);
+  --theme-badge: var(--brand-500);
+
+  --theme-chrome-gradient: linear-gradient(
+    160deg,
+    #0b3b45 0%,
+    #093240 22%,
+    #071b24 45%,
+    #051219 68%,
+    #030a0e 100%
+  );
+  --theme-chrome-bg: #030a0e;
+}
+
+/* Nota sobre la transición del punto 12 del pedido: no hace falta una
+   regla CSS global para lograrla. La mayoría de los botones/links/badges
+   de la app YA tienen su propia clase Tailwind "transition-colors" (o
+   equivalente) desde que se construyeron — al cambiar --brand-* esos
+   elementos ya animan solos, sin agregar nada acá. El único elemento sin
+   transición propia es el degradado del Header/Sidebar (chromeGradient.ts),
+   que la declara puntualmente ahí (no acá) porque `background-image` no
+   siempre interpola entre degradados y agregar una regla global de
+   transición a selectores amplios (button, a, [class*="border"], etc.)
+   es innecesario y un riesgo de rendimiento en tablas/Kanban grandes. */

@@ -61,6 +61,12 @@ model User {
   city                 String?
   phoneExtension       String?
   notificationLanguage String?
+  // Tema visual elegido por el usuario (Avatar → Tema del sistema).
+  // Puramente cosmético — nunca condiciona permisos ni datos, solo qué
+  // variables de color usa la interfaz (ver globals.css). Default
+  // AURORA_VIOLET para que cualquier usuario ya existente (o creado antes
+  // de esta migración) arranque con el tema principal, sin quedar en null.
+  themePreference       ThemeName @default(AURORA_VIOLET)
   workFormat           String?  // ej. "Remoto", "Híbrido", "Presencial" — texto libre por ahora
   supervisorId         String?
   supervisor           User?    @relation("UserSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull)
@@ -100,6 +106,16 @@ model User {
   // cuentas que ya existían antes de esta migración).
   internalMailbox InternalMailbox?
   mailAuditLogs   MailAuditLog[]
+}
+
+// Los 4 temas visuales seleccionables desde Avatar → Tema del sistema
+// (ver docs de Fase "Temas personalizables"). Puramente cromático — no
+// afecta estructura, layout ni datos.
+enum ThemeName {
+  AURORA_VIOLET
+  NEBULA_BLUE
+  COSMIC_ROSE
+  GALAXY_CYAN
 }
 
 enum UserStatus {

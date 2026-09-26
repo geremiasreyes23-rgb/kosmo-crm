@@ -6,6 +6,7 @@ import { MainFrame } from "./MainFrame";
 import { MessengerProvider } from "@/components/messenger/MessengerProvider";
 import { NotificationProvider } from "@/components/notifications/NotificationProvider";
 import { ToastNotificationProvider } from "@/components/notifications/ToastNotificationProvider";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import type { SessionUser } from "@/lib/auth";
 import type { TimeEntryPayload } from "@/app/(app)/clock-actions";
 import type { ProfileViewData } from "@/app/(app)/profile/data";
@@ -33,6 +34,7 @@ export function AppShell({
     // resto de eventos: tareas, correo interno, citas, Turning 65) pueden
     // lanzar una notificación emergente con useNotifyToast() sin importar
     // en qué pantalla del CRM esté el usuario.
+    <ThemeProvider initialTheme={user.themePreference}>
     <ToastNotificationProvider>
       <MessengerProvider initialData={messengerData}>
         <NotificationProvider initialData={notificationData}>
@@ -60,5 +62,6 @@ export function AppShell({
         </NotificationProvider>
       </MessengerProvider>
     </ToastNotificationProvider>
+    </ThemeProvider>
   );
 }

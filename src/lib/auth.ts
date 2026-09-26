@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
+import type { ThemeName } from "@prisma/client";
 import { prisma } from "./db";
 
 /**
@@ -54,6 +55,8 @@ export interface SessionUser {
    * users-actions.ts. Solo es null para cuentas legadas no vinculadas
    * todavía (se resuelve con el backfill del seed). */
   agentId: string | null;
+  /** Tema visual elegido (Avatar → Tema del sistema) — ver src/lib/themes.ts. */
+  themePreference: ThemeName;
 }
 
 /** true si el rol del usuario puede ver todo el negocio, no solo lo propio
@@ -136,6 +139,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     mustChangePassword: session.user.mustChangePassword,
     permissions,
     agentId: session.user.agentId,
+    themePreference: session.user.themePreference,
   };
 }
 

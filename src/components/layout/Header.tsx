@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Menu, Building2, LogOut, KeyRound, ChevronDown, UserCircle, Loader2, Users, UserPlus, FileCheck2, Building } from "lucide-react";
+import { Search, Menu, Building2, LogOut, KeyRound, ChevronDown, UserCircle, Loader2, Users, UserPlus, FileCheck2, Building, Palette } from "lucide-react";
 import { logoutAction } from "@/app/(app)/logout-action";
 import { ClockWidget } from "./ClockWidget";
 import { ProfileModal } from "@/components/profile/ProfileModal";
+import { ThemeModal } from "@/components/theme/ThemeModal";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { LiveClock } from "./LiveClock";
 import { CHROME_GRADIENT_STYLE } from "./chromeGradient";
@@ -27,6 +28,7 @@ export function Header({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [themeModalOpen, setThemeModalOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase();
   const fullName = `${user.firstName} ${user.lastName}`;
@@ -216,6 +218,16 @@ export function Header({
               >
                 <UserCircle className="h-4 w-4" /> Mi perfil
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setThemeModalOpen(true);
+                }}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-[var(--ink-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--ink-primary)]"
+              >
+                <Palette className="h-4 w-4" /> Tema del sistema
+              </button>
               <a
                 href="/change-password"
                 className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-[var(--ink-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--ink-primary)]"
@@ -235,6 +247,7 @@ export function Header({
       </div>
 
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} data={profileData} />
+      <ThemeModal open={themeModalOpen} onClose={() => setThemeModalOpen(false)} />
     </header>
   );
 }
