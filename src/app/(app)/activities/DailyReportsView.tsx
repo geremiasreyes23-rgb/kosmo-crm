@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
-import { Select, Textarea } from "@/components/ui/Field";
+import { Textarea } from "@/components/ui/Field";
 import { createDailyReportAction, reviewDailyReportAction } from "./reports-actions";
 import { useNotifyToast } from "@/components/notifications/ToastNotificationProvider";
-import { formatTime, initials } from "@/lib/utils";
+import { formatTime, initials, cn } from "@/lib/utils";
 import type { DailyReportVM, DailyReportStatus } from "@/types";
 import {
   Send,
@@ -19,11 +18,15 @@ import {
   CheckCircle2,
   Sparkles,
   ChevronRight,
+  ChevronDown,
   ShieldCheck,
   ThumbsUp,
   ThumbsDown,
   FileText,
   Inbox,
+  CalendarCheck2,
+  CalendarDays,
+  Check,
 } from "lucide-react";
 
 const MAX_LEN = 2000;
@@ -44,6 +47,24 @@ const STATUS_LABEL: Record<DailyReportStatus, string> = {
   APPROVED: "Aprobado",
   REJECTED: "Rechazado",
 };
+
+// Paleta sutil de variación por fila del historial (sección 6 del pedido de
+// diseño: "lavanda / azul suave / rosa suave / verde suave"), deliberadamente
+// separada de los colores de estado del Badge (que siguen significando
+// Aprobado/En revisión/Rechazado) — acá solo distingue visualmente una fila
+// de la siguiente, como en un calendario, sin volverse infantil.
+const ROW_PALETTE = [
+  { block: "bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300", accent: "bg-violet-400" },
+  { block: "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300", accent: "bg-sky-400" },
+  { block: "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300", accent: "bg-rose-400" },
+  { block: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300", accent: "bg-emerald-400" },
+];
+
+const IMPORTANT_ITEMS = [
+  { icon: Lock, title: "Seguro", description: "Tus reportes están protegidos." },
+  { icon: Clock3, title: "Automático", description: "Se guarda fecha y hora." },
+  { icon: CheckCircle2, title: "Sin ediciones", description: "Solo lectura después de guardar." },
+];
 
 function startOfDay(d: Date): Date {
   const c = new Date(d);
@@ -84,6 +105,63 @@ function dayBlockParts(iso: string) {
   const monthYear = new Intl.DateTimeFormat("es-ES", { month: "short", year: "numeric" }).format(d);
   const weekdayRaw = new Intl.DateTimeFormat("es-ES", { weekday: "long" }).format(d);
   return { day, monthYear, weekday: weekdayRaw.charAt(0).toUpperCase() + weekdayRaw.slice(1) };
+}
+
+/** Selector premium del rango de fechas del historial — reemplaza el
+ * `<select>` nativo por una píldora con icono + dropdown flotante, mismo
+ * patrón de "click afuera para cerrar" que el menú de usuario del Header. */
+function RangeFilterPill({
+  preset,
+  onChange,
+}: {
+  preset: RangePreset;
+  onChange: (p: RangePreset) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onPointerDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 rounded-full border border-violet-100 bg-[var(--surface-card)] px-4 py-2 text-xs font-medium text-[var(--ink-secondary)] shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md dark:border-violet-900/40"
+      >
+        <CalendarDays className="h-3.5 w-3.5 text-violet-600" />
+        {RANGE_LABELS[preset]}
+        <ChevronDown className={cn("h-3.5 w-3.5 text-[var(--ink-muted)] transition-transform duration-150", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-20 mt-2 w-48 origin-top-right overflow-hidden rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-card)] py-1.5 shadow-xl">
+          {(Object.keys(RANGE_LABELS) as RangePreset[]).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                onChange(key);
+                setOpen(false);
+              }}
+              className={cn(
+                "flex w-full items-center justify-between px-3.5 py-2 text-left text-xs transition-colors hover:bg-violet-50 dark:hover:bg-violet-950/30",
+                preset === key ? "font-semibold text-violet-600" : "text-[var(--ink-secondary)]"
+              )}
+            >
+              {RANGE_LABELS[key]}
+              {preset === key && <Check className="h-3.5 w-3.5" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function DailyReportsView({
@@ -194,31 +272,56 @@ export function DailyReportsView({
 
   return (
     <div>
-      <PageHeader
-        title="Reportes diarios"
-        description="Cada reporte se guarda automáticamente con tu fecha y hora exactas."
-      />
+      {/* Hero — icono grande con degradado + composición asimétrica a la
+          izquierda, tarjeta flotante de motivación a la derecha (sección 2
+          del pedido de diseño). Este módulo tiene su propio encabezado en
+          vez de <PageHeader> genérico, a propósito: es el único que debe
+          tener esta presencia "hero". */}
+      <div className="relative mb-6 overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-white via-violet-50/50 to-indigo-50/40 p-6 shadow-sm dark:border-violet-900/30 dark:from-[var(--surface-card)] dark:via-violet-950/10 dark:to-indigo-950/10">
+        <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-gradient-to-br from-violet-200/50 to-transparent blur-3xl dark:from-violet-800/20" />
+        <div className="pointer-events-none absolute -left-10 bottom-0 h-36 w-36 rounded-full bg-gradient-to-tr from-indigo-200/40 to-transparent blur-3xl dark:from-indigo-800/10" />
 
-      <div className="mb-5 flex items-center gap-3 rounded-2xl border border-violet-200/70 bg-gradient-to-r from-violet-50 via-violet-50/60 to-transparent px-4 py-3 dark:border-violet-900/40 dark:from-violet-950/30 dark:via-violet-950/10">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-600/10 text-violet-600">
-          <Sparkles className="h-4.5 w-4.5" />
+        <div className="relative flex flex-wrap items-start justify-between gap-5">
+          <div className="flex items-start gap-4">
+            <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 via-violet-600 to-indigo-600 shadow-lg shadow-violet-500/25">
+              <CalendarCheck2 className="h-7 w-7 text-white" />
+              <span className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5 rounded-full bg-white shadow ring-2 ring-violet-200 dark:ring-violet-800" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">Actividades</p>
+              <h1 className="mt-0.5 text-2xl font-bold text-[var(--ink-primary)]">Reportes diarios</h1>
+              <p className="mt-1.5 max-w-md text-sm text-[var(--ink-secondary)]">
+                Registra tus actividades del día. Tu reporte se guardará automáticamente con la fecha y hora,
+                y quedará disponible para revisión.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 shadow-md shadow-violet-500/5 backdrop-blur-sm dark:border-violet-900/30 dark:bg-white/5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-950/50">
+              <Sparkles className="h-4.5 w-4.5" />
+            </div>
+            <p className="max-w-[13rem] text-xs leading-snug text-[var(--ink-secondary)]">
+              Tu esfuerzo de hoy también construye{" "}
+              <span className="font-semibold text-violet-600">los resultados de mañana.</span>
+            </p>
+          </div>
         </div>
-        <p className="text-sm text-[var(--ink-secondary)]">
-          Tu esfuerzo de hoy también construye los resultados de mañana.
-        </p>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
-        <Card className="animate-kosmo-fade-in-up overflow-hidden">
+        <Card className="relative animate-kosmo-fade-in-up overflow-hidden rounded-2xl border-violet-100/80 shadow-md shadow-violet-500/5 dark:border-violet-900/30">
           <div className="h-1.5 w-full bg-gradient-to-r from-violet-500 via-indigo-400 to-violet-300" />
-          <CardContent className="pt-4">
-            <div className="mb-3 flex items-center gap-2">
-              <FileText className="h-4.5 w-4.5 text-violet-600" />
-              <h2 className="text-sm font-semibold text-[var(--ink-primary)]">Nuevo reporte</h2>
+          <CardContent className="pt-5">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-sm shadow-violet-500/30">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-[var(--ink-primary)]">Nuevo reporte</h2>
+                <p className="text-xs text-[var(--ink-muted)]">Describe tus actividades del día. Sé claro y específico.</p>
+              </div>
             </div>
-            <p className="mb-3 text-xs text-[var(--ink-muted)]">
-              Cuéntanos qué hiciste hoy: gestiones, llamadas, resultados y pendientes.
-            </p>
 
             {formError && (
               <p className="mb-3 rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-[var(--status-critical)]">
@@ -231,24 +334,25 @@ export function DailyReportsView({
               maxLength={MAX_LEN}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Escribe aquí tu reporte del día..."
-              rows={6}
-              className="transition-shadow focus:shadow-[0_0_0_3px_rgba(124,58,237,0.12)]"
+              rows={8}
+              className="rounded-xl transition-shadow focus:shadow-[0_0_0_3px_rgba(124,58,237,0.12)]"
             />
             <div className="mt-1.5 flex items-center justify-between text-xs text-[var(--ink-muted)]">
               <span className="flex items-center gap-1">
                 <Clock3 className="h-3.5 w-3.5" />
-                Se guardará con la fecha y hora de este momento.
+                Se guardará automáticamente con la fecha y hora de envío.
               </span>
               <span className={content.length > MAX_LEN * 0.9 ? "font-medium text-[var(--status-warning)]" : undefined}>
                 {content.length}/{MAX_LEN}
               </span>
             </div>
 
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-5 flex items-center gap-3">
               <Button
                 onClick={handleSave}
                 disabled={saving || !content.trim()}
-                style={{ backgroundColor: "#7c3aed" }}
+                className="rounded-xl px-5 text-white shadow-lg shadow-violet-500/30 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-violet-500/40 disabled:hover:translate-y-0"
+                style={{ backgroundImage: "linear-gradient(90deg, #7c3aed, #4f46e5)" }}
               >
                 <Send className="h-4 w-4" />
                 {saving ? "Guardando..." : "Guardar reporte"}
@@ -262,33 +366,43 @@ export function DailyReportsView({
           </CardContent>
         </Card>
 
-        <Card className="animate-kosmo-fade-in-up border-violet-200/70 bg-gradient-to-b from-violet-50/60 to-transparent dark:border-violet-900/40 dark:from-violet-950/20">
-          <CardContent className="pt-4">
-            <div className="mb-2 flex items-center gap-2">
-              <ShieldCheck className="h-4.5 w-4.5 text-violet-600" />
-              <h2 className="text-sm font-semibold text-[var(--ink-primary)]">Importante</h2>
+        <Card className="animate-kosmo-fade-in-up overflow-hidden rounded-2xl border-violet-100/80 bg-gradient-to-b from-violet-50/70 via-[var(--surface-card)] to-[var(--surface-card)] shadow-md shadow-violet-500/5 dark:border-violet-900/30 dark:from-violet-950/20">
+          <CardContent className="pt-5">
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-950/50">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <h2 className="text-base font-semibold text-[var(--ink-primary)]">Importante</h2>
             </div>
-            <p className="mb-3 text-xs text-[var(--ink-secondary)]">
-              Una vez guardado, tu reporte queda registrado de forma permanente y no podrá editarse.
+            <p className="mb-4 text-xs leading-relaxed text-[var(--ink-secondary)]">
+              Una vez guardado, el reporte no podrá ser editado. Solo será visible para revisión y validación.
             </p>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 rounded-lg bg-[var(--surface-card)]/70 px-2.5 py-1.5 text-xs text-[var(--ink-secondary)]">
-                <Lock className="h-3.5 w-3.5 text-violet-600" /> Seguro
-              </div>
-              <div className="flex items-center gap-2 rounded-lg bg-[var(--surface-card)]/70 px-2.5 py-1.5 text-xs text-[var(--ink-secondary)]">
-                <Clock3 className="h-3.5 w-3.5 text-violet-600" /> Automático
-              </div>
-              <div className="flex items-center gap-2 rounded-lg bg-[var(--surface-card)]/70 px-2.5 py-1.5 text-xs text-[var(--ink-secondary)]">
-                <CheckCircle2 className="h-3.5 w-3.5 text-violet-600" /> Sin ediciones
-              </div>
+            <div className="space-y-2">
+              {IMPORTANT_ITEMS.map((item) => (
+                <div
+                  key={item.title}
+                  className="flex items-start gap-3 rounded-xl bg-[var(--surface-card)]/80 p-2.5 shadow-sm ring-1 ring-violet-100/70 dark:ring-violet-900/30"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600 dark:bg-violet-950/50">
+                    <item.icon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-[var(--ink-primary)]">{item.title}</p>
+                    <p className="text-[11px] text-[var(--ink-muted)]">{item.description}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="mt-6">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-[var(--ink-primary)]">Historial de reportes</h2>
+      <div className="mt-7">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-[var(--ink-primary)]">Historial de reportes</h2>
+            <p className="text-xs text-[var(--ink-muted)]">Aquí puedes ver todos tus reportes guardados.</p>
+          </div>
           <div className="flex items-center gap-2">
             {preset === "custom" && (
               <>
@@ -306,61 +420,71 @@ export function DailyReportsView({
                 />
               </>
             )}
-            <Select
-              value={preset}
-              onChange={(e) => setPreset(e.target.value as RangePreset)}
-              className="w-auto"
-            >
-              {(Object.keys(RANGE_LABELS) as RangePreset[]).map((key) => (
-                <option key={key} value={key}>
-                  {RANGE_LABELS[key]}
-                </option>
-              ))}
-            </Select>
+            <RangeFilterPill preset={preset} onChange={setPreset} />
           </div>
         </div>
 
-        <div className={`space-y-2 transition-opacity ${isPending ? "opacity-50" : "opacity-100"}`}>
-          {filtered.map((r) => {
+        <div className={`space-y-2.5 transition-opacity ${isPending ? "opacity-50" : "opacity-100"}`}>
+          {filtered.map((r, i) => {
             const { day, monthYear, weekday } = dayBlockParts(r.createdAt);
+            const palette = ROW_PALETTE[i % ROW_PALETTE.length];
             return (
               <button
                 key={r.id}
                 onClick={() => openDetail(r)}
-                className="animate-kosmo-fade-in group flex w-full items-center gap-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-card)] p-3.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md"
+                className="animate-kosmo-fade-in group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)] py-4 pl-5 pr-4 text-left shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-lg"
               >
-                <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-violet-50 text-violet-700 dark:bg-violet-950/40">
-                  <span className="text-lg font-bold leading-none">{day}</span>
-                  <span className="mt-0.5 text-[10px] uppercase leading-none">{monthYear}</span>
+                <span className={cn("absolute inset-y-0 left-0 w-1", palette.accent)} />
+                <div className={cn("flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-2xl", palette.block)}>
+                  <span className="text-xl font-bold leading-none">{day}</span>
+                  <span className="mt-1 text-[9px] font-semibold uppercase leading-none tracking-wide">{monthYear}</span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-[var(--ink-primary)]">
+                    <p className="text-sm font-semibold text-[var(--ink-primary)]">
                       Reporte del día · {weekday}
                     </p>
-                    <Badge status={statusBadge(r.status)}>{STATUS_LABEL[r.status]}</Badge>
                     {canReview && (
                       <span className="text-xs text-[var(--ink-muted)]">{r.userName}</span>
                     )}
                   </div>
                   <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">{r.content}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-3 text-xs text-[var(--ink-muted)]">
-                  <span>{formatTime(r.createdAt)}</span>
-                  <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <span className="text-xs font-medium text-[var(--ink-muted)]">{formatTime(r.createdAt)}</span>
+                  <Badge status={statusBadge(r.status)}>{STATUS_LABEL[r.status]}</Badge>
                 </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-muted)] transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-violet-500" />
               </button>
             );
           })}
-          {filtered.length === 0 && (
-            <Card>
-              <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-                <Inbox className="h-8 w-8 text-[var(--ink-muted)]" />
-                <p className="text-sm text-[var(--ink-muted)]">
-                  No hay reportes en este rango de fechas.
+
+          {filtered.length === 0 && reports.length === 0 && (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-violet-200 bg-gradient-to-b from-violet-50/50 to-transparent px-6 py-14 text-center dark:border-violet-900/30">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-100 text-violet-500 dark:bg-violet-950/40">
+                <Inbox className="h-7 w-7" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[var(--ink-primary)]">No hay reportes todavía</p>
+                <p className="mt-1 text-xs text-[var(--ink-muted)]">
+                  Cuando registres tu primera actividad del día, aparecerá aquí.
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+          )}
+
+          {filtered.length === 0 && reports.length > 0 && (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-violet-200 bg-gradient-to-b from-violet-50/50 to-transparent px-6 py-14 text-center dark:border-violet-900/30">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-100 text-violet-500 dark:bg-violet-950/40">
+                <Inbox className="h-7 w-7" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[var(--ink-primary)]">Sin reportes en este rango</p>
+                <p className="mt-1 text-xs text-[var(--ink-muted)]">
+                  Prueba con otro período — tus reportes anteriores siguen guardados.
+                </p>
+              </div>
+            </div>
           )}
         </div>
       </div>
