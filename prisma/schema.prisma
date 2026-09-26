@@ -1012,6 +1012,14 @@ model Notification {
   relatedEntityId  String?
   isRead           Boolean  @default(false)
   createdAt        DateTime @default(now())
+
+  // Fase 15 (auditoría de rendimiento) — la campanita filtra por
+  // (userId, createdAt) en cada carga, y notificationScheduler.ts (cada 5
+  // minutos, para siempre) filtra por la tupla completa para no duplicar
+  // avisos. Ninguna de las dos quedaba cubierta por el índice implícito de
+  // la FK userId sola.
+  @@index([userId, createdAt])
+  @@index([userId, type, relatedEntityType, relatedEntityId])
 }
 
 model AuditLog {

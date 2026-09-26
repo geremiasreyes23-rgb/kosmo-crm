@@ -30,21 +30,27 @@ function fullName(u: { firstName: string; lastName: string }) {
 export async function syncSystemEventsFromAuditLog(): Promise<void> {
   const since = new Date(Date.now() - SYNC_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-  const [alreadyProcessed, candidates] = await Promise.all([
-    prisma.feedPost.findMany({
-      where: { sourceAuditLogId: { not: null } },
-      select: { sourceAuditLogId: true },
-    }),
-    prisma.auditLog.findMany({
-      where: {
-        createdAt: { gte: since },
-        action: "CREATE",
-        entityType: { in: ["Client", "Sale", "User"] },
-      },
-      orderBy: { createdAt: "asc" },
-      take: SYNC_BATCH_SIZE,
-    }),
-  ]);
+  // Fase 15 (auditoría de rendimiento) — antes esto traía TODOS los
+  // FeedPost de sistema jamás creados, sin límite, en cada carga del Feed
+  // (crece para siempre con la vida de la agencia). Ahora se acota a los
+  // ids candidatos de esta tanda: basta para saber cuáles de ESOS ya están
+  // procesados.
+  const candidates = await prisma.auditLog.findMany({
+    where: {
+      createdAt: { gte: since },
+      action: "CREATE",
+      entityType: { in: ["Client", "Sale", "User"] },
+    },
+    orderBy: { createdAt: "asc" },
+    take: SYNC_BATCH_SIZE,
+  });
+  if (candidates.length === 0) return;
+
+  const candidateIds = candidates.map((c) => c.id);
+  const alreadyProcessed = await prisma.feedPost.findMany({
+    where: { sourceAuditLogId: { in: candidateIds } },
+    select: { sourceAuditLogId: true },
+  });
 
   const processedIds = new Set(alreadyProcessed.map((p) => p.sourceAuditLogId));
   const pending = candidates.filter((row) => !processedIds.has(row.id));

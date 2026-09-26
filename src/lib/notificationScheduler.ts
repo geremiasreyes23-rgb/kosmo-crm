@@ -52,30 +52,49 @@ function toVM(row: {
   };
 }
 
-/** Crea la notificación solo si no existe ya una igual (mismo usuario, tipo
- * y entidad relacionada) — así el scan puede correr cada 5 minutos sin
- * duplicar avisos cada vez que vuelve a encontrar la misma tarea vencida. */
-async function createIfMissing(params: {
+interface PendingNotification {
   userId: string;
   type: string;
   title: string;
   message: string;
   relatedEntityType: string;
   relatedEntityId: string;
-}) {
-  const existing = await prisma.notification.findFirst({
-    where: {
-      userId: params.userId,
-      type: params.type,
-      relatedEntityType: params.relatedEntityType,
-      relatedEntityId: params.relatedEntityId,
-    },
-    select: { id: true },
-  });
-  if (existing) return;
+}
 
-  const row = await prisma.notification.create({ data: params });
-  publishNotificationEvent({ type: "notification", userId: params.userId, notification: toVM(row) });
+function notificationKey(n: Pick<PendingNotification, "userId" | "type" | "relatedEntityType" | "relatedEntityId">) {
+  return `${n.userId}|${n.type}|${n.relatedEntityType}|${n.relatedEntityId}`;
+}
+
+/** Fase 15 (auditoría de rendimiento) — versión en lote de lo que antes era
+ * createIfMissing() llamado una vez por fila dentro de un for. Con cientos
+ * de tareas vencidas/leads parados, eso era un SELECT (y a veces INSERT)
+ * secuencial POR FILA, cada 5 minutos, para siempre — la enorme mayoría ya
+ * notificadas en un scan anterior. Acá se resuelve "¿cuáles de estos N ya
+ * existen?" con un único SELECT (un OR de tuplas), y solo se hace un INSERT
+ * por cada una que de verdad sea nueva (típicamente ninguna, en estado
+ * estable).
+ */
+async function createMissingNotifications(items: PendingNotification[]) {
+  if (items.length === 0) return;
+
+  const existing = await prisma.notification.findMany({
+    where: {
+      OR: items.map((n) => ({
+        userId: n.userId,
+        type: n.type,
+        relatedEntityType: n.relatedEntityType,
+        relatedEntityId: n.relatedEntityId,
+      })),
+    },
+    select: { userId: true, type: true, relatedEntityType: true, relatedEntityId: true },
+  });
+  const existingKeys = new Set(existing.map((e) => notificationKey({ ...e, relatedEntityType: e.relatedEntityType ?? "", relatedEntityId: e.relatedEntityId ?? "" })));
+
+  const toCreate = items.filter((n) => !existingKeys.has(notificationKey(n)));
+  for (const params of toCreate) {
+    const row = await prisma.notification.create({ data: params });
+    publishNotificationEvent({ type: "notification", userId: params.userId, notification: toVM(row) });
+  }
 }
 
 async function scanTasks(now: Date) {
@@ -85,31 +104,31 @@ async function scanTasks(now: Date) {
     where: { status: { notIn: ["COMPLETED", "CANCELLED"] }, dueDate: { lt: now } },
     select: { id: true, title: true, assignedToId: true },
   });
-  for (const t of overdue) {
-    await createIfMissing({
+  await createMissingNotifications(
+    overdue.map((t) => ({
       userId: t.assignedToId,
       type: "task_overdue",
       title: "Tarea vencida",
       message: t.title,
       relatedEntityType: "Task",
       relatedEntityId: t.id,
-    });
-  }
+    }))
+  );
 
   const upcoming = await prisma.task.findMany({
     where: { status: { notIn: ["COMPLETED", "CANCELLED"] }, dueDate: { gte: now, lte: soon } },
     select: { id: true, title: true, assignedToId: true },
   });
-  for (const t of upcoming) {
-    await createIfMissing({
+  await createMissingNotifications(
+    upcoming.map((t) => ({
       userId: t.assignedToId,
       type: "task_upcoming",
       title: "Tarea por vencer",
       message: t.title,
       relatedEntityType: "Task",
       relatedEntityId: t.id,
-    });
-  }
+    }))
+  );
 }
 
 async function scanAppointments(now: Date) {
@@ -121,20 +140,21 @@ async function scanAppointments(now: Date) {
     },
     select: { id: true, title: true, userId: true },
   });
-  for (const a of upcoming) {
-    await createIfMissing({
+  await createMissingNotifications(
+    upcoming.map((a) => ({
       userId: a.userId,
       type: "upcoming_appointment",
       title: "Cita próxima",
       message: a.title,
       relatedEntityType: "Appointment",
       relatedEntityId: a.id,
-    });
-  }
+    }))
+  );
 }
 
 async function scanDocumentationPending(now: Date) {
   const threshold = new Date(now.getTime() - DOC_PENDING_THRESHOLD_MS);
+  const pending: PendingNotification[] = [];
 
   const leads = await prisma.lead.findMany({
     where: { stage: { name: DOC_PENDING_STAGE_NAME } },
@@ -165,7 +185,7 @@ async function scanDocumentationPending(now: Date) {
 
     const daysWaiting = Math.max(1, Math.floor((now.getTime() - enteredAt.getTime()) / (24 * 60 * 60 * 1000)));
 
-    await createIfMissing({
+    pending.push({
       userId: l.agent.user.id,
       type: "documentation_pending",
       title: "Documentación pendiente",
@@ -174,11 +194,25 @@ async function scanDocumentationPending(now: Date) {
       relatedEntityId: l.id,
     });
   }
+
+  await createMissingNotifications(pending);
 }
 
 async function scanTurning65(now: Date) {
+  // Fase 15 (auditoría de rendimiento) — antes esto traía TODA la tabla de
+  // Client con dob no nulo (crece para siempre) y filtraba la edad en JS.
+  // La ventana de "cumple 65 en los próximos N días" corresponde a un rango
+  // acotado de fechas de nacimiento exactamente 65 años atrás — se calcula
+  // acá y se filtra en el WHERE, así el scan (que corre cada 5 minutos para
+  // siempre) escala con la cantidad de gente que cumple años esta ventana,
+  // no con el total histórico de clientes.
+  const windowStart = new Date(now);
+  windowStart.setFullYear(windowStart.getFullYear() - 65);
+  const windowEnd = new Date(now.getTime() + TURNING_65_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  windowEnd.setFullYear(windowEnd.getFullYear() - 65);
+
   const clients = await prisma.client.findMany({
-    where: { dob: { not: null } },
+    where: { dob: { gte: windowStart, lte: windowEnd } },
     select: {
       id: true,
       firstName: true,
@@ -188,14 +222,15 @@ async function scanTurning65(now: Date) {
     },
   });
 
+  const pending: PendingNotification[] = [];
   for (const c of clients) {
     if (!c.dob || !c.agent?.user) continue; // sin agente vinculado a un User, no hay a quién avisarle
     const turns65 = new Date(c.dob);
     turns65.setFullYear(turns65.getFullYear() + 65);
     const daysUntil = (turns65.getTime() - now.getTime()) / (24 * 60 * 60 * 1000);
-    if (daysUntil < 0 || daysUntil > TURNING_65_WINDOW_DAYS) continue;
+    if (daysUntil < 0 || daysUntil > TURNING_65_WINDOW_DAYS) continue; // margen fino (meses de 28-31 días) — el WHERE ya acotó lo grueso
 
-    await createIfMissing({
+    pending.push({
       userId: c.agent.user.id,
       type: "turning_65",
       title: "Cliente cumple 65 años",
@@ -204,6 +239,7 @@ async function scanTurning65(now: Date) {
       relatedEntityId: c.id,
     });
   }
+  await createMissingNotifications(pending);
 }
 
 export async function scanAndGenerateNotifications() {
