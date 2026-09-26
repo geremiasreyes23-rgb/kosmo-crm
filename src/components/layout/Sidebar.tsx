@@ -118,11 +118,11 @@ export function Sidebar({ showReports }: { showReports: boolean }) {
           depende de `expanded` en absoluto), el efecto de montaje corre una
           sola vez, para siempre. */}
       <div
-        className="absolute left-0 top-0 z-40 flex h-16 w-60 shrink-0 items-center gap-2 px-5"
+        className="absolute left-0 top-0 z-40 flex h-16 w-60 shrink-0 items-center gap-2.5 px-5"
         style={CHROME_GRADIENT_STYLE}
       >
-        <HolographicSphere size={22} enableHover={false} className="shrink-0" />
-        <KosmoTextMark fontSize={16} />
+        <HolographicSphere size={30} enableHover={false} className="shrink-0" />
+        <KosmoTextMark fontSize={21} />
       </div>
 
       <div
@@ -189,11 +189,6 @@ export function Sidebar({ showReports }: { showReports: boolean }) {
             )}
             {expanded && <span className="whitespace-nowrap">Recoger</span>}
           </button>
-          {expanded && (
-            <p className="mt-2 whitespace-nowrap px-3 text-xs text-[#7d8bb3]">
-              v0.1 · Fase 1 — UI Shell
-            </p>
-          )}
         </div>
       </div>
     </aside>
