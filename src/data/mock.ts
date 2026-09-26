@@ -91,10 +91,10 @@ export const leads: Lead[] = [
 ];
 
 export const clients: Client[] = [
-  { id: "C-3081", firstName: "Josefina", lastName: "Ramírez", dob: "1958-03-12", phone: "(305) 555-0201", email: "josefina.ramirez@example.com", address: "1200 Brickell Ave", state: "FL", county: "Miami-Dade", preferredLanguage: "Español", agentName: "Carlos Gómez", aorName: "Alliance Insurance", createdAt: "2023-04-11", activePolicies: 2, linesOfBusiness: ["Medicare Advantage"] },
-  { id: "C-3082", firstName: "Manuel", lastName: "Torres", dob: "1972-11-02", phone: "(786) 555-0212", email: "manuel.torres@example.com", address: "45 SW 8th St", state: "FL", county: "Miami-Dade", preferredLanguage: "Español", agentName: "Ana Ibarra", createdAt: "2024-01-22", activePolicies: 1, linesOfBusiness: ["Obamacare"] },
-  { id: "C-3083", firstName: "Gloria", lastName: "Mendoza", dob: "1960-07-19", phone: "(407) 555-0223", address: "780 Orange Ave", state: "FL", county: "Orange", preferredLanguage: "Español", agentName: "Carlos Gómez", createdAt: "2022-09-30", activePolicies: 3, linesOfBusiness: ["Medicare Advantage", "Family Heritage"] },
-  { id: "C-3084", firstName: "Ricardo", lastName: "Vega", dob: "1985-02-28", phone: "(954) 555-0234", address: "22 Las Olas Blvd", state: "FL", county: "Broward", preferredLanguage: "Inglés", agentName: "Ana Ibarra", createdAt: "2025-06-14", activePolicies: 1, linesOfBusiness: ["Obamacare"] },
+  { id: "C-3081", clientNumber: 3081, firstName: "Josefina", lastName: "Ramírez", dob: "1958-03-12", phone: "(305) 555-0201", email: "josefina.ramirez@example.com", address: "1200 Brickell Ave", state: "FL", county: "Miami-Dade", preferredLanguage: "Español", agentName: "Carlos Gómez", aorName: "Alliance Insurance", createdAt: "2023-04-11", activePolicies: 2, linesOfBusiness: ["Medicare Advantage"] },
+  { id: "C-3082", clientNumber: 3082, firstName: "Manuel", lastName: "Torres", dob: "1972-11-02", phone: "(786) 555-0212", email: "manuel.torres@example.com", address: "45 SW 8th St", state: "FL", county: "Miami-Dade", preferredLanguage: "Español", agentName: "Ana Ibarra", createdAt: "2024-01-22", activePolicies: 1, linesOfBusiness: ["Obamacare"] },
+  { id: "C-3083", clientNumber: 3083, firstName: "Gloria", lastName: "Mendoza", dob: "1960-07-19", phone: "(407) 555-0223", address: "780 Orange Ave", state: "FL", county: "Orange", preferredLanguage: "Español", agentName: "Carlos Gómez", createdAt: "2022-09-30", activePolicies: 3, linesOfBusiness: ["Medicare Advantage", "Family Heritage"] },
+  { id: "C-3084", clientNumber: 3084, firstName: "Ricardo", lastName: "Vega", dob: "1985-02-28", phone: "(954) 555-0234", address: "22 Las Olas Blvd", state: "FL", county: "Broward", preferredLanguage: "Inglés", agentName: "Ana Ibarra", createdAt: "2025-06-14", activePolicies: 1, linesOfBusiness: ["Obamacare"] },
 ];
 
 export const tasks: CrmTask[] = [

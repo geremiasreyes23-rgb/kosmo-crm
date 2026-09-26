@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search, Menu, Building2, LogOut, KeyRound, ChevronDown, UserCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Search, Menu, Building2, LogOut, KeyRound, ChevronDown, UserCircle, Loader2, Users, UserPlus, FileCheck2, Building } from "lucide-react";
 import { logoutAction } from "@/app/(app)/logout-action";
 import { ClockWidget } from "./ClockWidget";
 import { ProfileModal } from "@/components/profile/ProfileModal";
@@ -9,6 +10,8 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { LiveClock } from "./LiveClock";
 import { CHROME_GRADIENT_STYLE } from "./chromeGradient";
 import { cn } from "@/lib/utils";
+import { globalSearchAction, type GlobalSearchResult, type GlobalSearchHit } from "@/lib/globalSearch";
+import type { LucideIcon } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
 import type { TimeEntryPayload } from "@/app/(app)/clock-actions";
 import type { ProfileViewData } from "@/app/(app)/profile/data";
@@ -36,6 +39,62 @@ export function Header({
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, []);
 
+  // Buscador global — busca clientes (por nombre, teléfono, email o ID
+  // visible), leads, pólizas y carriers, con debounce para no disparar una
+  // consulta en cada tecla. El resultado se agrupa por categoría en un
+  // dropdown, igual que el buscador de Gmail/Linear.
+  const router = useRouter();
+  const searchRef = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [results, setResults] = useState<GlobalSearchResult | null>(null);
+
+  useEffect(() => {
+    function onPointerDown(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false);
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setSearchOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setResults(null);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    const timer = setTimeout(() => {
+      globalSearchAction(q)
+        .then((r) => setResults(r))
+        .finally(() => setSearchLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const hasResults =
+    !!results &&
+    (results.clients.length > 0 ||
+      results.leads.length > 0 ||
+      results.policies.length > 0 ||
+      results.carriers.length > 0);
+
+  function goTo(href: string) {
+    setSearchOpen(false);
+    setQuery("");
+    setResults(null);
+    router.push(href);
+  }
+
   return (
     <header
       className="grid h-16 shrink-0 grid-cols-[auto_1fr_auto] items-center gap-4 px-4 md:px-6"
@@ -54,12 +113,42 @@ export function Header({
           desktop el buscador y el grupo de la derecha se corrían una
           columna hacia la izquierda, dejando la 3ra columna vacía. */}
       <div className="col-start-2 flex justify-center">
-        <div className="relative w-full max-w-xl">
+        <div className="relative w-full max-w-xl" ref={searchRef}>
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
           <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSearchOpen(true);
+            }}
+            onFocus={() => setSearchOpen(true)}
             placeholder="Buscar cliente, lead, póliza, carrier..."
-            className="h-10 w-full rounded-full border border-transparent bg-white/[0.08] pl-10 pr-4 text-sm text-white outline-none placeholder:text-white/40 transition-all duration-150 hover:bg-white/[0.12] focus:border-white/15 focus:bg-[#1c1030] focus:shadow-[0_4px_18px_rgba(0,0,0,0.45)]"
+            className="h-10 w-full rounded-full border border-transparent bg-white/[0.08] pl-10 pr-9 text-sm text-white outline-none placeholder:text-white/40 transition-all duration-150 hover:bg-white/[0.12] focus:border-white/15 focus:bg-[#1c1030] focus:shadow-[0_4px_18px_rgba(0,0,0,0.45)]"
           />
+          {searchLoading && (
+            <Loader2 className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/50" />
+          )}
+
+          {searchOpen && query.trim().length >= 2 && (
+            <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-[26rem] overflow-y-auto rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-card)] shadow-xl">
+              {!results && searchLoading && (
+                <p className="px-4 py-6 text-center text-sm text-[var(--ink-muted)]">Buscando...</p>
+              )}
+              {results && !hasResults && !searchLoading && (
+                <p className="px-4 py-6 text-center text-sm text-[var(--ink-muted)]">
+                  Sin resultados para &quot;{query}&quot;.
+                </p>
+              )}
+              {results && hasResults && (
+                <div className="py-1.5">
+                  <SearchGroup icon={Users} label="Clientes" hits={results.clients} onSelect={goTo} />
+                  <SearchGroup icon={UserPlus} label="Leads" hits={results.leads} onSelect={goTo} />
+                  <SearchGroup icon={FileCheck2} label="Pólizas" hits={results.policies} onSelect={goTo} />
+                  <SearchGroup icon={Building} label="Carriers" hits={results.carriers} onSelect={goTo} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -147,5 +236,42 @@ export function Header({
 
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} data={profileData} />
     </header>
+  );
+}
+
+function SearchGroup({
+  icon: Icon,
+  label,
+  hits,
+  onSelect,
+}: {
+  icon: LucideIcon;
+  label: string;
+  hits: GlobalSearchHit[];
+  onSelect: (href: string) => void;
+}) {
+  if (hits.length === 0) return null;
+  return (
+    <div className="px-1.5 py-1">
+      <p className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-muted)]">
+        {label}
+      </p>
+      {hits.map((hit) => (
+        <button
+          key={hit.id}
+          type="button"
+          onClick={() => onSelect(hit.href)}
+          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-hover)]"
+        >
+          <Icon className="h-4 w-4 shrink-0 text-[var(--ink-muted)]" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-[var(--ink-primary)]">{hit.label}</p>
+            {hit.sublabel && (
+              <p className="truncate text-xs text-[var(--ink-muted)]">{hit.sublabel}</p>
+            )}
+          </div>
+        </button>
+      ))}
+    </div>
   );
 }

@@ -22,7 +22,7 @@ import { getNotesForUser } from "@/lib/notes/data";
 import { getDocumentsForUser } from "@/lib/documents/data";
 import { NotesTab } from "@/components/records/NotesTab";
 import { DocumentsTab } from "@/components/records/DocumentsTab";
-import { formatCurrency, formatDate, formatTime, timeSince, calculateAge } from "@/lib/utils";
+import { formatCurrency, formatDate, formatTime, timeSince, calculateAge, formatClientCode } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { ArrowLeftCircle, ClipboardList, ShieldCheck } from "lucide-react";
 
@@ -86,6 +86,7 @@ export default async function ClientDetailPage({
 
       <div className="mb-4 flex flex-wrap gap-2">
         <Badge status="good">Activo</Badge>
+        <Badge status="neutral" className="font-mono">{formatClientCode(client.clientNumber)}</Badge>
         <Badge status="neutral">Vendedor: {client.agentName}</Badge>
         {client.aorName && <Badge status="neutral">AOR: {client.aorName}</Badge>}
         {client.dob && <Badge status="info">{calculateAge(client.dob)} años</Badge>}

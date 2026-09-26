@@ -6,6 +6,13 @@ export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
 }
 
+/** ID visible de cliente, asignado por el sistema (Client.clientNumber,
+ * autoincremental de Postgres) — nunca se captura a mano. Formato fijo de 6
+ * dígitos con ceros a la izquierda, ej. "C-000123". */
+export function formatClientCode(clientNumber: number): string {
+  return `C-${String(clientNumber).padStart(6, "0")}`;
+}
+
 /** Formatea un valor monetario en USD. */
 export function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {

@@ -14,7 +14,7 @@ import { Drawer } from "@/components/ui/Drawer";
 import { createClientAction } from "./actions";
 import type { ClientFormOptions } from "./data";
 import type { Client } from "@/types";
-import { formatDate, calculateAge } from "@/lib/utils";
+import { formatDate, calculateAge, formatClientCode } from "@/lib/utils";
 import { Plus, Search } from "lucide-react";
 
 function initials(first: string, last: string) {
@@ -73,10 +73,15 @@ export function ClientsView({
       if (lineFilter && !c.linesOfBusiness.includes(lineFilter)) return false;
       if (agentFilter && c.agentName !== agentFilter) return false;
       if (!q) return true;
+      const code = formatClientCode(c.clientNumber).toLowerCase();
       return (
         `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
         (c.phone ?? "").toLowerCase().includes(q) ||
-        (c.email ?? "").toLowerCase().includes(q)
+        (c.email ?? "").toLowerCase().includes(q) ||
+        code.includes(q) ||
+        // También coincide si se busca solo el número, con o sin ceros a la
+        // izquierda (ej. "123" o "000123" encuentran "C-000123").
+        String(c.clientNumber).includes(q.replace(/^0+/, "") || "0")
       );
     });
   }, [clients, search, lineFilter, agentFilter]);
@@ -160,6 +165,7 @@ export function ClientsView({
         <Table>
           <THead>
             <Tr>
+              <Th>ID</Th>
               <Th>Cliente</Th>
               <Th>Edad</Th>
               <Th>Contacto</Th>
@@ -172,6 +178,7 @@ export function ClientsView({
           <TBody>
             {visibleClients.map((c) => (
               <Tr key={c.id}>
+                <Td className="font-mono text-xs text-[var(--ink-muted)]">{formatClientCode(c.clientNumber)}</Td>
                 <Td>
                   <Link href={`/clients/${c.id}`} className="flex items-center gap-2.5 font-medium text-[var(--ink-primary)] hover:text-[var(--brand-500)]">
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--brand-100)] text-[10px] font-semibold text-[var(--brand-700)]">
@@ -197,7 +204,7 @@ export function ClientsView({
             ))}
             {visibleClients.length === 0 && (
               <Tr>
-                <Td colSpan={7} className="text-sm text-[var(--ink-muted)]">
+                <Td colSpan={8} className="text-sm text-[var(--ink-muted)]">
                   Sin clientes que coincidan con la búsqueda.
                 </Td>
               </Tr>

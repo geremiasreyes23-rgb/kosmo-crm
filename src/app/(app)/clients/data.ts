@@ -40,6 +40,7 @@ function mapClient(row: ClientRow, sourceName?: string): ClientVM {
 
   return {
     id: row.id,
+    clientNumber: row.clientNumber,
     firstName: row.firstName,
     lastName: row.lastName,
     dob: row.dob ? row.dob.toISOString().slice(0, 10) : undefined,

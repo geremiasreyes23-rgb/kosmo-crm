@@ -63,6 +63,9 @@ export interface SensitiveFieldVM {
 
 export interface Client {
   id: string;
+  /** ID visible asignado por el sistema (Client.clientNumber) — usar
+   * formatClientCode() en src/lib/utils.ts para mostrarlo como "C-000123". */
+  clientNumber: number;
   firstName: string;
   lastName: string;
   dob?: string;
