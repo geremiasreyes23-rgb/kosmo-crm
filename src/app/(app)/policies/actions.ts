@@ -71,6 +71,17 @@ export async function createPolicyAction(input: CreatePolicyInput): Promise<Poli
 
 /** Cambio de estado de una póliza (Cotización → ... → Activa/Cancelada, etc.).
  * Respeta el mismo alcance por rol que el resto del módulo. */
+const VALID_POLICY_STATUSES: PolicyStatus[] = [
+  "QUOTE",
+  "APPLICATION",
+  "PENDING",
+  "APPROVED",
+  "ACTIVE",
+  "CANCELLED",
+  "REJECTED",
+  "CHARGEBACK",
+];
+
 export async function updatePolicyStatusAction(
   policyId: string,
   status: PolicyStatus
@@ -78,6 +89,12 @@ export async function updatePolicyStatusAction(
   const user = await requireUser();
   if (!hasPermission(user, "policies", "edit")) {
     return { ok: false, error: "No tienes permiso para editar pólizas." };
+  }
+  // Fase 15 — una Server Action es invocable directo (bypassea los tipos de
+  // TypeScript), así que sin este chequeo un valor arbitrario llegaba crudo
+  // a Prisma y reventaba con un error de enum inválido sin manejar.
+  if (!VALID_POLICY_STATUSES.includes(status)) {
+    return { ok: false, error: "Estado de póliza inválido." };
   }
 
   const policy = await prisma.policy.findUnique({ where: { id: policyId } });

@@ -65,10 +65,15 @@ export async function createTaskAction(input: CreateTaskInput): Promise<TaskActi
 /** Cambia el estado de una tarea (ej. "Marcar completada") — exige ser el
  * asignado, tener alcance "ver todo", o que la tarea esté ligada a un
  * lead/cliente propio (mismo criterio de alcance que getTasksForUser). */
+const VALID_TASK_STATUSES: TaskStatus[] = ["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
+
 export async function updateTaskStatusAction(taskId: string, status: TaskStatus): Promise<TaskActionResult> {
   const user = await requireUser();
   if (!hasPermission(user, "tasks", "edit")) {
     return { ok: false, error: "No tienes permiso para editar tareas." };
+  }
+  if (!VALID_TASK_STATUSES.includes(status)) {
+    return { ok: false, error: "Estado de tarea inválido." };
   }
 
   const task = await prisma.task.findUnique({ where: { id: taskId }, include: { lead: true, client: true } });

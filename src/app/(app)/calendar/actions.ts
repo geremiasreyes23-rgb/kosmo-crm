@@ -63,6 +63,8 @@ export async function createAppointmentAction(input: CreateAppointmentInput): Pr
 
 /** Cambia el estado de una cita (Confirmar / Completar / Cancelar / No se
  * presentó) — mismo criterio de alcance que getAppointmentsForUser. */
+const VALID_APPOINTMENT_STATUSES: AppointmentStatus[] = ["SCHEDULED", "CONFIRMED", "COMPLETED", "CANCELLED", "NO_SHOW"];
+
 export async function updateAppointmentStatusAction(
   appointmentId: string,
   status: AppointmentStatus
@@ -70,6 +72,9 @@ export async function updateAppointmentStatusAction(
   const user = await requireUser();
   if (!hasPermission(user, "calendar", "edit")) {
     return { ok: false, error: "No tienes permiso para editar citas." };
+  }
+  if (!VALID_APPOINTMENT_STATUSES.includes(status)) {
+    return { ok: false, error: "Estado de cita inválido." };
   }
 
   const appointment = await prisma.appointment.findUnique({

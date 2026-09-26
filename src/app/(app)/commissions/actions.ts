@@ -15,6 +15,8 @@ export interface CommissionActionResult {
  * Al marcar Pagada por primera vez se registra la fecha de pago del
  * vendedor — no se pisa si ya existía (un cambio posterior de estado no
  * debe borrar cuándo se pagó realmente). */
+const VALID_COMMISSION_STATUSES: CommissionStatus[] = ["PENDING", "PAID", "CHARGEBACK"];
+
 export async function updateCommissionStatusAction(
   commissionId: string,
   status: CommissionStatus
@@ -22,6 +24,9 @@ export async function updateCommissionStatusAction(
   const user = await requireUser();
   if (!hasPermission(user, "commissions", "edit")) {
     return { ok: false, error: "No tienes permiso para editar comisiones." };
+  }
+  if (!VALID_COMMISSION_STATUSES.includes(status)) {
+    return { ok: false, error: "Estado de comisión inválido." };
   }
 
   const commission = await prisma.commission.findUnique({
