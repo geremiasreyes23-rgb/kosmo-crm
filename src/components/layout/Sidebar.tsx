@@ -45,6 +45,7 @@ type NavItem = {
 const CRM_ROUTES = ["/leads", "/clients", "/sales", "/policies"];
 
 const navItems: NavItem[] = [
+  { href: "/feed", label: "Feed", icon: Newspaper, color: "#9061f9", badge: 0 },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, color: "#3987e5", badge: 0 },
   { href: "/messages", label: "Mensajes", icon: MessageCircle, color: "#20b6ac", badge: 0 },
   { href: "/mail", label: "Correo", icon: Mail, color: "#5b6bd6", badge: 0 },
@@ -54,7 +55,6 @@ const navItems: NavItem[] = [
   { href: "/calendar", label: "Calendario", icon: CalendarDays, color: "#1baf7a", badge: 0 },
   { href: "/commissions", label: "Comisiones", icon: DollarSign, color: "#eda100", badge: 0 },
   { href: "/documents", label: "Documentos", icon: FolderOpen, color: "#8b5cf6", badge: 0 },
-  { href: "/feed", label: "Feed", icon: Newspaper, color: "#9061f9", badge: 0 },
   { href: "/reports", label: "Reportes", icon: BarChart3, color: "#eb6834", badge: 0 },
   { href: "/settings", label: "Configuración", icon: Settings, color: "#898781", badge: 0 },
 ];
