@@ -34,7 +34,7 @@ export default function LogoTestPreviewPage() {
               letterSpacing: "0.02em",
               color: "#ffffff",
               lineHeight: 1,
-              fontFamily: "var(--font-kosmo)",
+              fontFamily: "var(--font-kosmo-brand)",
             }}
           >
             KOSMO
@@ -50,7 +50,7 @@ export default function LogoTestPreviewPage() {
               letterSpacing: "0.02em",
               color: "#ffffff",
               lineHeight: 1,
-              fontFamily: "var(--font-kosmo)",
+              fontFamily: "var(--font-kosmo-brand)",
             }}
           >
             KOSMO

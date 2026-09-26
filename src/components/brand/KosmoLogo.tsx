@@ -57,7 +57,10 @@ export function KosmoWordmark({
  * cliente para acompañar la esfera holográfica (login y sidebar). No es el
  * logotipo ilustrado registrado (ese sigue siendo `KosmoWordmark`, y sus
  * PNG de marca no se tocan); esto es simplemente el nombre en la tipografía
- * de marca (Century Gothic vía --font-kosmo), en negrita.
+ * de marca (Century Gothic vía --font-kosmo-brand), en negrita. Usa una
+ * variable de fuente propia, separada de --font-kosmo (que es Inter, para
+ * el texto general de la interfaz) — este tratamiento es parte del logo y
+ * nunca cambia junto con la tipografía del resto de la app.
  */
 export function KosmoTextMark({
   fontSize = 32,
@@ -79,7 +82,7 @@ export function KosmoTextMark({
         letterSpacing: "0.02em",
         color,
         lineHeight: 1,
-        fontFamily: "var(--font-kosmo)",
+        fontFamily: "var(--font-kosmo-brand)",
         whiteSpace: "nowrap",
         ...style,
       }}

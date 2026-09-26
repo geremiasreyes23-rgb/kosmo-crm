@@ -38,12 +38,20 @@
   --status-info: #1c5cab;
   --status-info-bg: #e8f0fb;
 
-  /* Tipografía global — Inter (cargada vía next/font en layout.tsx, que
-     define --font-inter). Reemplaza a Century Gothic: se mantiene el
-     nombre de variable --font-kosmo para no tener que tocar cada
-     componente que ya la referencia. Fallbacks por si next/font no llegó
-     a inyectar la variable (SSR muy temprano, etc.). */
+  /* Tipografía global de la interfaz — Inter (cargada vía next/font en
+     layout.tsx, que define --font-inter). Reemplaza a Century Gothic para
+     el texto general de la app (legibilidad + consistencia entre sistemas
+     operativos). Fallbacks por si next/font no llegó a inyectar la
+     variable (SSR muy temprano, etc.). */
   --font-kosmo: var(--font-inter), "Segoe UI", system-ui, sans-serif;
+
+  /* Tipografía DE MARCA — Century Gothic, exclusiva del wordmark "KOSMO"
+     que acompaña a la esfera holográfica (sidebar, login, cambio de
+     contraseña: ver KosmoTextMark en src/components/brand/KosmoLogo.tsx).
+     Deliberadamente separada de --font-kosmo de arriba: ese cambio a Inter
+     fue para el texto general de la interfaz, NUNCA para el logotipo — el
+     logo (imagen + este tratamiento tipográfico específico) no se toca. */
+  --font-kosmo-brand: "Century Gothic", CenturyGothic, "Segoe UI", system-ui, sans-serif;
 
   /* Mensajería — estilo de chat tipo WhatsApp/Bitrix24 pedido explícitamente:
      fondo rosado con textura sutil de puntos, burbujas propias en verde

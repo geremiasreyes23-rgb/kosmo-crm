@@ -113,11 +113,9 @@ export default function LoginPage() {
           <div className="rounded-2xl border border-white/15 bg-white/[0.07] p-6 shadow-[0_8px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
             <div className="mb-5">
               <h1 className="text-lg font-semibold text-white">Bienvenido</h1>
-              <p className="text-sm text-white/60">
-                {step === "email"
-                  ? "Inicia sesión en tu cuenta de KOSMO"
-                  : "Ingresa tu contraseña para continuar"}
-              </p>
+              {step === "password" && (
+                <p className="text-sm text-white/60">Ingresa tu contraseña para continuar</p>
+              )}
             </div>
 
             {step === "email" ? (
