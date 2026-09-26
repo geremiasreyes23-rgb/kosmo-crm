@@ -128,6 +128,7 @@ async function folderIdOf(mailboxId: string, type: MailFolderType): Promise<stri
 export async function sendMessageAction(input: SendMessageInput): Promise<MailActionResult> {
   const { user, error } = await requireMailUser("create");
   if (error) return { ok: false, error };
+  if (!user) return { ok: false, error: "No autorizado." };
 
   const settings = await getMailSettings();
   if (!settings.isEnabled) {
@@ -259,6 +260,7 @@ export async function sendMessageAction(input: SendMessageInput): Promise<MailAc
 export async function saveDraftAction(input: Omit<SendMessageInput, "to"> & { to?: string[] }): Promise<MailActionResult> {
   const { user, error } = await requireMailUser("create");
   if (error) return { ok: false, error };
+  if (!user) return { ok: false, error: "No autorizado." };
 
   const senderMailbox = await getOwnMailbox(user);
   const subject = input.subject.trim();
@@ -330,6 +332,7 @@ export async function getMessageDetailAction(recipientRowId: string): Promise<
 > {
   const { user, error } = await requireMailUser("view");
   if (error) return { ok: false, error };
+  if (!user) return { ok: false, error: "No autorizado." };
 
   const row = await prisma.internalMessageRecipient.findUnique({
     where: { id: recipientRowId },
@@ -387,6 +390,7 @@ export async function moveMessageAction(
 ): Promise<MailActionResult> {
   const { user, error } = await requireMailUser("delete");
   if (error) return { ok: false, error };
+  if (!user) return { ok: false, error: "No autorizado." };
 
   const row = await prisma.internalMessageRecipient.findUnique({ where: { id: recipientRowId }, include: { mailbox: true } });
   if (!row || row.mailbox.userId !== user.id) return { ok: false, error: "Correo no encontrado." };
@@ -412,6 +416,7 @@ export async function moveMessageAction(
 export async function permanentlyDeleteMessageAction(recipientRowId: string): Promise<MailActionResult> {
   const { user, error } = await requireMailUser("delete");
   if (error) return { ok: false, error };
+  if (!user) return { ok: false, error: "No autorizado." };
 
   const row = await prisma.internalMessageRecipient.findUnique({ where: { id: recipientRowId }, include: { mailbox: true } });
   if (!row || row.mailbox.userId !== user.id) return { ok: false, error: "Correo no encontrado." };
@@ -443,6 +448,7 @@ export async function downloadAttachmentAction(
 ): Promise<{ ok: true; fileName: string; mimeType: string; dataUrl: string } | { ok: false; error: string }> {
   const { user, error } = await requireMailUser("view");
   if (error) return { ok: false, error };
+  if (!user) return { ok: false, error: "No autorizado." };
 
   const attachment = await prisma.internalAttachment.findUnique({
     where: { id: attachmentId },
@@ -468,6 +474,7 @@ export async function loadFolderMessagesAction(
 ): Promise<{ ok: true; messages: MailMessageRowVM[] } | { ok: false; error: string }> {
   const { user, error } = await requireMailUser("view");
   if (error) return { ok: false, error };
+  if (!user) return { ok: false, error: "No autorizado." };
 
   const mailbox = await getOwnMailbox(user);
   const folder = await prisma.mailFolder.findUnique({ where: { id: folderId } });

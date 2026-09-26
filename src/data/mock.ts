@@ -4,7 +4,6 @@
 import type {
   Lead,
   Client,
-  Policy,
   Sale,
   CrmTask,
   ActivityItem,
@@ -106,14 +105,6 @@ export const clients: Client[] = [
   { id: "C-3082", firstName: "Manuel", lastName: "Torres", dob: "1972-11-02", phone: "(786) 555-0212", email: "manuel.torres@example.com", address: "45 SW 8th St", state: "FL", county: "Miami-Dade", preferredLanguage: "Español", agentName: "Ana Ibarra", createdAt: "2024-01-22", activePolicies: 1, linesOfBusiness: ["Obamacare"] },
   { id: "C-3083", firstName: "Gloria", lastName: "Mendoza", dob: "1960-07-19", phone: "(407) 555-0223", address: "780 Orange Ave", state: "FL", county: "Orange", preferredLanguage: "Español", agentName: "Carlos Gómez", createdAt: "2022-09-30", activePolicies: 3, linesOfBusiness: ["Medicare Advantage", "Family Heritage"] },
   { id: "C-3084", firstName: "Ricardo", lastName: "Vega", dob: "1985-02-28", phone: "(954) 555-0234", address: "22 Las Olas Blvd", state: "FL", county: "Broward", preferredLanguage: "Inglés", agentName: "Ana Ibarra", createdAt: "2025-06-14", activePolicies: 1, linesOfBusiness: ["Obamacare"] },
-];
-
-export const policies: Policy[] = [
-  { id: "P-9001", policyNumber: "MED-778812", clientName: "Josefina Ramírez", line: "Medicare Advantage", carrier: "Humana", planName: "Gold Plus HMO", premium: 0, saleDate: "2023-04-11", effectiveDate: "2023-05-01", status: "ACTIVE", agentName: "Carlos Gómez" },
-  { id: "P-9002", policyNumber: "OBA-441029", clientName: "Manuel Torres", line: "Obamacare", carrier: "Oscar Health", planName: "Silver Simple", premium: 128, saleDate: "2024-01-22", effectiveDate: "2024-02-01", status: "ACTIVE", agentName: "Ana Ibarra" },
-  { id: "P-9003", policyNumber: "FH-220091", clientName: "Gloria Mendoza", line: "Family Heritage", carrier: "Family Heritage Life", planName: "Elite 8 Family", premium: 89, saleDate: "2022-09-30", effectiveDate: "2022-10-15", status: "ACTIVE", agentName: "Carlos Gómez" },
-  { id: "P-9004", policyNumber: "OBA-441077", clientName: "Ricardo Vega", line: "Obamacare", carrier: "Ambetter", planName: "Bronze Basic", premium: 64, saleDate: "2025-06-14", effectiveDate: "2025-07-01", status: "PENDING", agentName: "Ana Ibarra" },
-  { id: "P-9005", policyNumber: "MED-778850", clientName: "Gloria Mendoza", line: "Medicare Advantage", carrier: "CarePlus", planName: "Complete Care HMO", premium: 0, saleDate: "2024-11-02", effectiveDate: "2024-12-01", status: "CANCELLED", agentName: "Carlos Gómez" },
 ];
 
 export const salesPipeline: Sale[] = [

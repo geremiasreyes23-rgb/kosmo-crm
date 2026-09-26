@@ -10,9 +10,9 @@ const MANAGER_ROLES = ["Super Admin", "Admin"];
 async function requireUserManager() {
   const current = await requireUser();
   if (!MANAGER_ROLES.includes(current.roleName)) {
-    return { current: null as const, error: "No tienes permiso para gestionar usuarios." };
+    return { current: null, error: "No tienes permiso para gestionar usuarios." };
   }
-  return { current, error: null as const };
+  return { current, error: null };
 }
 
 async function activeSuperAdminCount(excludeUserId?: string) {
@@ -132,6 +132,7 @@ export async function setUserStatusAction(
 ): Promise<UserActionResult> {
   const { current, error } = await requireUserManager();
   if (error) return { ok: false, error };
+  if (!current) return { ok: false, error: "No autorizado." };
 
   if (userId === current.id) {
     return { ok: false, error: "No puedes desactivar tu propia cuenta." };
@@ -193,6 +194,7 @@ export async function resetPasswordAction(userId: string): Promise<UserActionRes
 export async function deleteUserAction(userId: string): Promise<UserActionResult> {
   const { current, error } = await requireUserManager();
   if (error) return { ok: false, error };
+  if (!current) return { ok: false, error: "No autorizado." };
 
   if (userId === current.id) {
     return { ok: false, error: "No puedes eliminar tu propia cuenta." };
