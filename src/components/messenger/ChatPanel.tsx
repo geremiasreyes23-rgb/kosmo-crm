@@ -134,12 +134,27 @@ export function ChatPanel({
   if (!user) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/brand/messenger-welcome.png"
-          alt=""
-          className="animate-kosmo-fade-in-up h-24 w-auto object-contain"
-        />
+        {/* Dos capas alineadas pixel a pixel (mismo lienzo, mismo tamaño
+            renderizado): la base (astronauta + planeta + asta) queda
+            estática, y encima la bandera sola ondea con una rotación
+            chica sobre su propio punto de unión al asta — el resto del
+            dibujo nunca se mueve. Ver globals.css (kosmo-flag-wave) y el
+            recorte de las dos capas en public/brand/. */}
+        <div className="animate-kosmo-fade-in-up relative h-24 aspect-[480/381]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/messenger-welcome-base.png"
+            alt=""
+            className="absolute inset-0 h-full w-full object-contain"
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/messenger-welcome-flag.png"
+            alt=""
+            className="animate-kosmo-flag-wave absolute inset-0 h-full w-full object-contain"
+            style={{ transformOrigin: "56.5% 12.5%" }}
+          />
+        </div>
         <div className="animate-kosmo-fade-in-up">
           <p className="text-sm font-semibold text-[var(--ink-primary)]">Selecciona una conversación</p>
           <p className="mt-1 text-xs text-[var(--ink-muted)]">

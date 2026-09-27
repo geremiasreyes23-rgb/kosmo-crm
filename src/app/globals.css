@@ -165,6 +165,17 @@ body {
   70% { box-shadow: 0 0 0 5px rgba(185, 121, 15, 0); }
   100% { box-shadow: 0 0 0 0 rgba(185, 121, 15, 0); }
 }
+/* Bandera del astronauta en la pantalla vacía de Mensajería (Selecciona
+   una conversación) — la tela ondea suavemente, apoyada en el asta
+   (transform-origin fijo en el punto de unión, ver ChatPanel.tsx). Sutil
+   a propósito: un rango de rotación chico y un settle de escala mínimo,
+   nunca algo vistoso — es un estado de espera, no una animación llamativa. */
+@keyframes kosmo-flag-wave {
+  0%, 100% { transform: rotate(-2.5deg) skewY(-1.5deg); }
+  50% { transform: rotate(3deg) skewY(1.5deg); }
+}
+.animate-kosmo-flag-wave { animation: kosmo-flag-wave 2.6s ease-in-out infinite; }
+
 
 .animate-kosmo-fade-in { animation: kosmo-fade-in 0.18s ease-out both; }
 .animate-kosmo-fade-in-up { animation: kosmo-fade-in-up 0.22s ease-out both; }
