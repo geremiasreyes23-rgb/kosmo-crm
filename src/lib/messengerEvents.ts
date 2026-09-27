@@ -95,6 +95,11 @@ const CHANNEL = "messenger";
 const PRESENCE_CHANNEL = "messenger-presence";
 
 export function publishMessengerEvent(event: MessengerEvent) {
+  // LOG TEMPORAL DE DIAGNÓSTICO — bug "los mensajes no llegan en tiempo
+  // real". Se borra en cuanto quede resuelto.
+  console.log(
+    `[DIAG messengerEvents] publish type=${event.type} conv=${event.conversationId} listeners=${messengerEvents.listenerCount(CHANNEL)}`
+  );
   messengerEvents.emit(CHANNEL, event);
 }
 

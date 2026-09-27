@@ -19,6 +19,7 @@ export async function GET() {
   if (!user) {
     return new Response("No autorizado", { status: 401 });
   }
+  const userId = user.id;
 
   const encoder = new TextEncoder();
   let unsubscribe: (() => void) | null = null;
@@ -30,13 +31,23 @@ export async function GET() {
       function send(data: unknown) {
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-        } catch {
+          // LOG TEMPORAL DE DIAGNÓSTICO — se borra en cuanto se resuelva el
+          // bug de mensajes que no llegan en tiempo real.
+          console.log(
+            `[DIAG messenger/stream] enqueue OK para user=${userId} data=${JSON.stringify(data).slice(0, 120)}`
+          );
+        } catch (err) {
+          console.log(`[DIAG messenger/stream] enqueue FALLÓ para user=${userId}: ${String(err)}`);
           // El controller ya se cerró (cliente desconectado) — se limpia en cancel().
         }
       }
 
       unsubscribe = subscribeMessengerEvents((event) => {
-        if (event.participantIds.includes(user.id)) {
+        const matches = event.participantIds.includes(userId);
+        console.log(
+          `[DIAG messenger/stream] evento recibido type=${event.type} conv=${event.conversationId} participantIds=${JSON.stringify(event.participantIds)} yo=${userId} coincide=${matches}`
+        );
+        if (matches) {
           send(event);
         }
       });
@@ -51,7 +62,7 @@ export async function GET() {
 
       // Esta pestaña cuenta como una conexión real de `user` — presencia
       // de verdad, no "¿tiene una sesión sin vencer?" (ver src/lib/presence.ts).
-      markUserOnline(user.id);
+      markUserOnline(userId);
 
       // Mantiene viva la conexión a través de proxies/balanceadores que
       // cortan conexiones inactivas (comentario SSE — el cliente lo ignora).
@@ -69,7 +80,7 @@ export async function GET() {
       unsubscribe?.();
       unsubscribePresence?.();
       if (heartbeat) clearInterval(heartbeat);
-      markUserOffline(user.id);
+      markUserOffline(userId);
     },
   });
 
