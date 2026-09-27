@@ -60,6 +60,14 @@ export async function GET() {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      // Railway (y otros hosts detrás de un proxy tipo nginx) por defecto
+      // bufferean la respuesta HTTP hasta que se llena el buffer o se
+      // cierra la conexión — en un stream SSE eso significa que los
+      // eventos NO llegan al instante, quedan atascados hasta que algo
+      // fuerza el flush (ej. recargar la página, que abre una conexión
+      // nueva y trae todo fresco desde la base de datos). Este header le
+      // dice explícitamente al proxy que no bufferee esta respuesta.
+      "X-Accel-Buffering": "no",
     },
   });
 }
