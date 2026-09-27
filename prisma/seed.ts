@@ -10,6 +10,8 @@
 import { PrismaClient, CustomFieldType, RecognitionType } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
+import { NAV_MODULE_KEYS } from "../src/lib/navModules";
+import { NOTIFICATION_SETTINGS } from "../src/lib/notificationSettings";
 
 const prisma = new PrismaClient();
 
@@ -159,6 +161,39 @@ async function main() {
   await grant("Manager", mailKeys);
   await grant("Agent", mailKeys);
   await grant("Viewer", mailKeys);
+
+  // Visibilidad de módulos del menú lateral (Sidebar.tsx) por rol —
+  // Fase 15+ (Configuración → Roles y permisos → "Visibilidad de
+  // módulos"). Antes de esto, el Sidebar tenía todos los módulos
+  // hardcodeados como visibles para todos los roles (con un único caso
+  // especial: Reportes solo para Super Admin/Admin, ni siquiera basado en
+  // el permiso "reports:view" que Agent/Manager/Viewer sí tienen). Se
+  // siembra TODO visible por defecto para los 5 roles base — el punto de
+  // este módulo es que un Admin lo ajuste desde Configuración según lo que
+  // decida la agencia, no que el seed imponga una configuración fija.
+  // `upsert` hace este bloque seguro de re-ejecutar sin pisar cambios ya
+  // guardados manualmente (el `update: {}` no toca `visible` si la fila
+  // ya existe).
+  console.log("Sembrando visibilidad de módulos por rol...");
+  for (const roleDef of roleDefs) {
+    const role = roles[roleDef.name];
+    for (const moduleKey of NAV_MODULE_KEYS) {
+      await prisma.roleModuleVisibility.upsert({
+        where: { roleId_moduleKey: { roleId: role.id, moduleKey } },
+        update: {},
+        create: { roleId: role.id, moduleKey, visible: true },
+      });
+    }
+  }
+
+  console.log("Sembrando configuración de notificaciones...");
+  for (const def of NOTIFICATION_SETTINGS) {
+    await prisma.notificationSetting.upsert({
+      where: { type: def.type },
+      update: {},
+      create: { type: def.type, enabled: def.defaultEnabled, thresholdValue: def.defaultThreshold },
+    });
+  }
 
   console.log("Sembrando catálogo de líneas de negocio...");
   const lineDefs = [

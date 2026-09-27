@@ -2,8 +2,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Tabs } from "@/components/ui/Tabs";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Plus } from "lucide-react";
 import { requireUser, hasPermission } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { UsersPanel } from "@/components/settings/UsersPanel";
@@ -13,6 +11,13 @@ import { MailSettingsPanel } from "@/components/settings/MailSettingsPanel";
 import { getMailAdminOverview } from "./mail-settings-actions";
 import { getAuditLogEntries } from "./audit-data";
 import { AuditLogPanel } from "@/components/settings/AuditLogPanel";
+import { RolePermissionsPanel } from "@/components/settings/RolePermissionsPanel";
+import { PipelinesPanel, type PipelineRow } from "@/components/settings/PipelinesPanel";
+import { InsuranceLinesPanel, type InsuranceLineRow } from "@/components/settings/InsuranceLinesPanel";
+import { CarriersPanel, type CarrierRow } from "@/components/settings/CarriersPanel";
+import { LeadSourcesPanel } from "@/components/settings/LeadSourcesPanel";
+import { NotificationSettingsPanel, type NotificationSettingRow } from "@/components/settings/NotificationSettingsPanel";
+import { NOTIFICATION_SETTINGS } from "@/lib/notificationSettings";
 import type { CommissionRateVM } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +30,6 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
   Viewer: "Solo lectura",
 };
 
-const lines = ["Medicare Advantage", "Obamacare", "Family Heritage"];
-
 export default async function SettingsPage() {
   const currentUser = await requireUser();
   const isManager = currentUser.roleName === "Super Admin" || currentUser.roleName === "Admin";
@@ -35,8 +38,24 @@ export default async function SettingsPage() {
   const canManageRates = hasPermission(currentUser, "commissions", "admin");
   const canViewAudit = hasPermission(currentUser, "audit", "view");
 
-  const [dbRoles, dbUsers, dbCustomFields, dbInsuranceLines, mailAdminOverview, dbCommissionRates, dbAgents, auditEntries] =
-    await Promise.all([
+  const [
+    dbRoles,
+    dbUsers,
+    dbCustomFields,
+    dbInsuranceLines,
+    mailAdminOverview,
+    dbCommissionRates,
+    dbAgents,
+    auditEntries,
+    dbPermissions,
+    dbRolePermissions,
+    dbModuleVisibility,
+    dbPipelines,
+    dbAllInsuranceLines,
+    dbCarriers,
+    dbLeadSources,
+    dbNotificationSettings,
+  ] = await Promise.all([
       prisma.role.findMany({ orderBy: { createdAt: "asc" } }),
       isManager
         ? prisma.user.findMany({
@@ -56,6 +75,25 @@ export default async function SettingsPage() {
       }),
       prisma.agent.findMany({ where: { status: "ACTIVE" }, orderBy: { firstName: "asc" } }),
       canViewAudit ? getAuditLogEntries() : Promise.resolve([]),
+      // Roles y permisos / Visibilidad de módulos — solo se traen si el
+      // usuario puede editarlos (isManager), igual que dbUsers arriba, para
+      // no armar la matriz completa de permisos en el servidor para
+      // cuentas que de todas formas no van a poder tocarla.
+      isManager ? prisma.permission.findMany({ orderBy: [{ resource: "asc" }, { action: "asc" }] }) : Promise.resolve([]),
+      isManager ? prisma.rolePermission.findMany({ select: { roleId: true, permissionId: true } }) : Promise.resolve([]),
+      isManager ? prisma.roleModuleVisibility.findMany({ where: { visible: true }, select: { roleId: true, moduleKey: true } }) : Promise.resolve([]),
+      prisma.pipeline.findMany({
+        orderBy: [{ entityType: "asc" }, { isDefault: "desc" }, { name: "asc" }],
+        include: { stages: { orderBy: { order: "asc" } } },
+      }),
+      // A diferencia de insuranceLineOptions (arriba, solo activas — para
+      // los formularios que crean pólizas/tarifas), acá se traen TODAS,
+      // porque el panel de Configuración necesita poder reactivar una que
+      // esté inactiva.
+      prisma.insuranceLine.findMany({ orderBy: { name: "asc" } }),
+      prisma.carrier.findMany({ include: { lines: true }, orderBy: { name: "asc" } }),
+      prisma.leadSource.findMany({ orderBy: { name: "asc" } }),
+      prisma.notificationSetting.findMany(),
     ]);
 
   const roleOptions = dbRoles.map((r) => ({ id: r.id, name: r.name }));
@@ -98,6 +136,44 @@ export default async function SettingsPage() {
   }));
   const agentOptions = dbAgents.map((a) => ({ id: a.id, name: `${a.firstName} ${a.lastName}` }));
 
+  const permissionRows = dbPermissions.map((p) => ({ id: p.id, resource: p.resource, action: p.action }));
+  const roleGrants: Record<string, string[]> = {};
+  for (const rp of dbRolePermissions) {
+    (roleGrants[rp.roleId] ??= []).push(rp.permissionId);
+  }
+  const roleModuleVisibilityMap: Record<string, string[]> = {};
+  for (const mv of dbModuleVisibility) {
+    (roleModuleVisibilityMap[mv.roleId] ??= []).push(mv.moduleKey);
+  }
+  const roleRows = dbRoles.map((r) => ({ id: r.id, name: r.name, isSystem: r.isSystem, description: r.description }));
+
+  const pipelineRows: PipelineRow[] = dbPipelines.map((p) => ({
+    id: p.id,
+    name: p.name,
+    entityType: p.entityType,
+    isDefault: p.isDefault,
+    stages: p.stages.map((s) => ({ id: s.id, name: s.name, order: s.order, isWon: s.isWon, isLost: s.isLost })),
+  }));
+
+  const insuranceLineRows: InsuranceLineRow[] = dbAllInsuranceLines.map((l) => ({
+    id: l.id,
+    name: l.name,
+    code: l.code,
+    isActive: l.isActive,
+  }));
+
+  const carrierRows: CarrierRow[] = dbCarriers.map((c) => ({
+    id: c.id,
+    name: c.name,
+    status: c.status,
+    insuranceLineIds: c.lines.map((l) => l.insuranceLineId),
+  }));
+
+  const notificationSettingValues: Record<string, NotificationSettingRow> = {};
+  for (const row of dbNotificationSettings) {
+    notificationSettingValues[row.type] = { type: row.type, enabled: row.enabled, thresholdValue: row.thresholdValue };
+  }
+
   return (
     <div>
       <PageHeader title="Configuración" description="Administración del sistema — todo configurable, nada hardcodeado" />
@@ -108,7 +184,15 @@ export default async function SettingsPage() {
               {
                 id: "roles",
                 label: "Roles y permisos",
-                content: (
+                content: isManager ? (
+                  <RolePermissionsPanel
+                    roles={roleRows}
+                    permissions={permissionRows}
+                    grants={roleGrants}
+                    moduleVisibility={roleModuleVisibilityMap}
+                    currentRoleName={currentUser.roleName}
+                  />
+                ) : (
                   <div className="space-y-2">
                     {dbRoles.map((r) => (
                       <div key={r.id} className="flex items-center justify-between rounded-lg border border-[var(--border-hairline)] px-3 py-2.5 text-sm">
@@ -121,31 +205,21 @@ export default async function SettingsPage() {
                         <Badge status="neutral">{r.isSystem ? "Rol base" : "Personalizado"}</Badge>
                       </div>
                     ))}
+                    <p className="pt-1 text-xs text-[var(--ink-muted)]">
+                      Solo Admin y Super Admin pueden editar permisos y visibilidad de módulos.
+                    </p>
                   </div>
                 ),
               },
               {
                 id: "pipelines",
                 label: "Pipelines y etapas",
-                content: (
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    Administra las etapas de los pipelines de Leads y Ventas (orden, ganada/perdida) — ver módulos Leads y Ventas para la vista Kanban en vivo.
-                  </p>
-                ),
+                content: <PipelinesPanel initialPipelines={pipelineRows} canManage={isManager} />,
               },
               {
                 id: "lines",
                 label: "Líneas de negocio",
-                content: (
-                  <div className="flex flex-wrap gap-2">
-                    {lines.map((l) => (
-                      <Badge key={l} status="info">{l}</Badge>
-                    ))}
-                    <Button size="sm" variant="secondary">
-                      <Plus className="h-4 w-4" /> Agregar línea
-                    </Button>
-                  </div>
-                ),
+                content: <InsuranceLinesPanel initialLines={insuranceLineRows} canManage={isManager} />,
               },
               {
                 id: "rates",
@@ -195,9 +269,29 @@ export default async function SettingsPage() {
                   </p>
                 ),
               },
-              { id: "carriers", label: "Carriers", content: <p className="text-sm text-[var(--ink-muted)]">Catálogo de carriers por línea de negocio.</p> },
-              { id: "sources", label: "Orígenes de leads", content: <p className="text-sm text-[var(--ink-muted)]">Base de datos, Referido, Evento, Llamada entrante, Otro.</p> },
-              { id: "notifications", label: "Notificaciones", content: <p className="text-sm text-[var(--ink-muted)]">Configuración de alertas: tareas vencidas, Turning 65, chargebacks, etc.</p> },
+              {
+                id: "carriers",
+                label: "Carriers",
+                content: (
+                  <CarriersPanel initialCarriers={carrierRows} insuranceLines={insuranceLineOptions} canManage={isManager} />
+                ),
+              },
+              {
+                id: "sources",
+                label: "Orígenes de leads",
+                content: <LeadSourcesPanel initialSources={dbLeadSources} canManage={isManager} />,
+              },
+              {
+                id: "notifications",
+                label: "Notificaciones",
+                content: (
+                  <NotificationSettingsPanel
+                    defs={NOTIFICATION_SETTINGS}
+                    initialValues={notificationSettingValues}
+                    canManage={isManager}
+                  />
+                ),
+              },
               ...(canViewAudit
                 ? [
                     {

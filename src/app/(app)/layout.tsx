@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { NAV_MODULE_KEYS } from "@/lib/navModules";
 import { getProfileViewData } from "./profile/data";
 import { getMessengerViewData } from "./messages/data";
 import { getNotificationsForUser } from "./notifications/data";
@@ -10,6 +11,23 @@ export const dynamic = "force-dynamic";
 
 export default async function AppGroupLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
+
+  // Qué módulos del Sidebar ve este usuario — Super Admin siempre ve todo
+  // (mismo criterio "bypass fijo" que hasPermission() en lib/auth.ts, para
+  // que nunca quede accidentalmente afuera de su propia Configuración);
+  // el resto lee RoleModuleVisibility, editable desde Configuración →
+  // Roles y permisos → "Visibilidad de módulos" (roles-actions.ts).
+  const visibleModuleKeys =
+    user.roleName === "Super Admin"
+      ? new Set(NAV_MODULE_KEYS)
+      : new Set(
+          (
+            await prisma.roleModuleVisibility.findMany({
+              where: { roleId: user.roleId, visible: true },
+              select: { moduleKey: true },
+            })
+          ).map((v) => v.moduleKey)
+        );
 
   // Jornada de fichaje abierta (si hay una) — se pasa al Header para que el
   // cronómetro arranque con el estado real guardado en base de datos, no
@@ -53,6 +71,7 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
       profileData={profileData}
       messengerData={messengerData}
       notificationData={notificationData}
+      visibleModuleKeys={visibleModuleKeys}
     >
       {children}
     </AppShell>

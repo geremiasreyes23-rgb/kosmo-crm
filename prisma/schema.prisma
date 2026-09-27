@@ -24,7 +24,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ---------------------------------------------------------------------------
@@ -173,6 +174,7 @@ model Role {
   isSystem    Boolean      @default(false) // roles base no eliminables
   users       User[]
   permissions RolePermission[]
+  moduleVisibility RoleModuleVisibility[]
   createdAt   DateTime     @default(now())
 }
 
@@ -192,6 +194,24 @@ model RolePermission {
   permission   Permission @relation(fields: [permissionId], references: [id])
 
   @@id([roleId, permissionId])
+}
+
+// Visibilidad de módulos del menú lateral por rol (Configuración → Roles y
+// permisos → "Visibilidad de módulos") — separado a propósito de
+// RolePermission: un permiso ("leads:view") controla si la ACCIÓN está
+// permitida a nivel de datos/servidor; esto controla si el ITEM DEL MENÚ
+// aparece en el Sidebar para ese rol. Antes el Sidebar tenía la lista de
+// módulos hardcodeada en el componente (todos visibles para todos los
+// roles salvo un único caso especial de Reportes) sin ninguna forma de
+// cambiarlo desde la UI — ver Sidebar.tsx. moduleKey coincide con el href
+// de cada item en navItems (Sidebar.tsx), ej. "/dashboard", "/reports".
+model RoleModuleVisibility {
+  roleId    String
+  moduleKey String
+  visible   Boolean @default(true)
+  role      Role    @relation(fields: [roleId], references: [id])
+
+  @@id([roleId, moduleKey])
 }
 
 // ---------------------------------------------------------------------------
@@ -1016,6 +1036,23 @@ model CustomFieldValue {
 // ---------------------------------------------------------------------------
 // 14. NOTIFICACIONES Y AUDITORÍA
 // ---------------------------------------------------------------------------
+
+// Configuración real de qué tipos de notificación automática están
+// prendidos y con qué umbral — Configuración → Notificaciones. Antes esa
+// pestaña era una sola línea de texto describiendo lo que el sistema hace
+// ("tareas vencidas, Turning 65, chargebacks") sin que nada de eso fuera
+// editable; los umbrales estaban fijos como constantes en
+// notificationScheduler.ts (TURNING_65_WINDOW_DAYS, etc.) y no existía
+// ninguna notificación de chargeback pese a que el texto la mencionaba.
+// `type` es uno de los NOTIFICATION_SETTING_TYPES catalogados en
+// src/lib/notificationSettings.ts (fuente de verdad del catálogo, no acá).
+// `thresholdValue` es la unidad que ese tipo use (horas o días, ver
+// catálogo) — null para los tipos que son solo on/off.
+model NotificationSetting {
+  type           String  @id
+  enabled        Boolean @default(true)
+  thresholdValue Int?
+}
 
 model Notification {
   id               String   @id @default(cuid())

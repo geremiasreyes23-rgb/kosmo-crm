@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "./db";
 import { publishNotificationEvent } from "./notificationEvents";
 import type { NotificationVM } from "@/types";
+import { NOTIFICATION_SETTINGS } from "./notificationSettings";
 
 /**
  * Generador de notificaciones automáticas — corre dentro del mismo proceso
@@ -25,10 +26,34 @@ import type { NotificationVM } from "@/types";
 
 const SCAN_INTERVAL_MS = 5 * 60 * 1000; // cada 5 minutos
 const FIRST_SCAN_DELAY_MS = 10 * 1000; // el primer scan no espera el intervalo completo
-const UPCOMING_WINDOW_MS = 24 * 60 * 60 * 1000; // "por vencer" / "próxima" = dentro de 24hs
-const TURNING_65_WINDOW_DAYS = 30;
-const DOC_PENDING_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000; // 3 días parado en "Documentación pendiente"
 const DOC_PENDING_STAGE_NAME = "Documentación pendiente";
+
+/**
+ * Los umbrales de cada tipo (antes constantes fijas acá mismo) ahora salen
+ * de NotificationSetting, editable desde Configuración → Notificaciones
+ * (roles-actions.ts... ver notifications-actions.ts). Se leen una vez al
+ * principio de cada scan (no en cada fila) y se cae al default del
+ * catálogo si por algún motivo falta la fila en base (instalación vieja
+ * sin sembrar, o seed no corrido todavía).
+ */
+interface ResolvedSetting {
+  enabled: boolean;
+  thresholdValue: number;
+}
+
+async function loadNotificationSettings(): Promise<Record<string, ResolvedSetting>> {
+  const rows = await prisma.notificationSetting.findMany();
+  const byType = new Map(rows.map((r) => [r.type, r]));
+  const resolved: Record<string, ResolvedSetting> = {};
+  for (const def of NOTIFICATION_SETTINGS) {
+    const row = byType.get(def.type);
+    resolved[def.type] = {
+      enabled: row?.enabled ?? def.defaultEnabled,
+      thresholdValue: row?.thresholdValue ?? def.defaultThreshold ?? 0,
+    };
+  }
+  return resolved;
+}
 
 function toVM(row: {
   id: string;
@@ -97,42 +122,46 @@ async function createMissingNotifications(items: PendingNotification[]) {
   }
 }
 
-async function scanTasks(now: Date) {
-  const soon = new Date(now.getTime() + UPCOMING_WINDOW_MS);
+async function scanTasks(now: Date, settings: Record<string, ResolvedSetting>) {
+  if (settings.task_overdue.enabled) {
+    const overdue = await prisma.task.findMany({
+      where: { status: { notIn: ["COMPLETED", "CANCELLED"] }, dueDate: { lt: now } },
+      select: { id: true, title: true, assignedToId: true },
+    });
+    await createMissingNotifications(
+      overdue.map((t) => ({
+        userId: t.assignedToId,
+        type: "task_overdue",
+        title: "Tarea vencida",
+        message: t.title,
+        relatedEntityType: "Task",
+        relatedEntityId: t.id,
+      }))
+    );
+  }
 
-  const overdue = await prisma.task.findMany({
-    where: { status: { notIn: ["COMPLETED", "CANCELLED"] }, dueDate: { lt: now } },
-    select: { id: true, title: true, assignedToId: true },
-  });
-  await createMissingNotifications(
-    overdue.map((t) => ({
-      userId: t.assignedToId,
-      type: "task_overdue",
-      title: "Tarea vencida",
-      message: t.title,
-      relatedEntityType: "Task",
-      relatedEntityId: t.id,
-    }))
-  );
-
-  const upcoming = await prisma.task.findMany({
-    where: { status: { notIn: ["COMPLETED", "CANCELLED"] }, dueDate: { gte: now, lte: soon } },
-    select: { id: true, title: true, assignedToId: true },
-  });
-  await createMissingNotifications(
-    upcoming.map((t) => ({
-      userId: t.assignedToId,
-      type: "task_upcoming",
-      title: "Tarea por vencer",
-      message: t.title,
-      relatedEntityType: "Task",
-      relatedEntityId: t.id,
-    }))
-  );
+  if (settings.task_upcoming.enabled) {
+    const soon = new Date(now.getTime() + settings.task_upcoming.thresholdValue * 60 * 60 * 1000);
+    const upcoming = await prisma.task.findMany({
+      where: { status: { notIn: ["COMPLETED", "CANCELLED"] }, dueDate: { gte: now, lte: soon } },
+      select: { id: true, title: true, assignedToId: true },
+    });
+    await createMissingNotifications(
+      upcoming.map((t) => ({
+        userId: t.assignedToId,
+        type: "task_upcoming",
+        title: "Tarea por vencer",
+        message: t.title,
+        relatedEntityType: "Task",
+        relatedEntityId: t.id,
+      }))
+    );
+  }
 }
 
-async function scanAppointments(now: Date) {
-  const soon = new Date(now.getTime() + UPCOMING_WINDOW_MS);
+async function scanAppointments(now: Date, settings: Record<string, ResolvedSetting>) {
+  if (!settings.upcoming_appointment.enabled) return;
+  const soon = new Date(now.getTime() + settings.upcoming_appointment.thresholdValue * 60 * 60 * 1000);
   const upcoming = await prisma.appointment.findMany({
     where: {
       status: { notIn: ["COMPLETED", "CANCELLED", "NO_SHOW"] },
@@ -152,8 +181,9 @@ async function scanAppointments(now: Date) {
   );
 }
 
-async function scanDocumentationPending(now: Date) {
-  const threshold = new Date(now.getTime() - DOC_PENDING_THRESHOLD_MS);
+async function scanDocumentationPending(now: Date, settings: Record<string, ResolvedSetting>) {
+  if (!settings.documentation_pending.enabled) return;
+  const threshold = new Date(now.getTime() - settings.documentation_pending.thresholdValue * 24 * 60 * 60 * 1000);
   const pending: PendingNotification[] = [];
 
   const leads = await prisma.lead.findMany({
@@ -198,7 +228,9 @@ async function scanDocumentationPending(now: Date) {
   await createMissingNotifications(pending);
 }
 
-async function scanTurning65(now: Date) {
+async function scanTurning65(now: Date, settings: Record<string, ResolvedSetting>) {
+  if (!settings.turning_65.enabled) return;
+  const windowDays = settings.turning_65.thresholdValue;
   // Fase 15 (auditoría de rendimiento) — antes esto traía TODA la tabla de
   // Client con dob no nulo (crece para siempre) y filtraba la edad en JS.
   // La ventana de "cumple 65 en los próximos N días" corresponde a un rango
@@ -208,7 +240,7 @@ async function scanTurning65(now: Date) {
   // no con el total histórico de clientes.
   const windowStart = new Date(now);
   windowStart.setFullYear(windowStart.getFullYear() - 65);
-  const windowEnd = new Date(now.getTime() + TURNING_65_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const windowEnd = new Date(now.getTime() + windowDays * 24 * 60 * 60 * 1000);
   windowEnd.setFullYear(windowEnd.getFullYear() - 65);
 
   const clients = await prisma.client.findMany({
@@ -228,7 +260,7 @@ async function scanTurning65(now: Date) {
     const turns65 = new Date(c.dob);
     turns65.setFullYear(turns65.getFullYear() + 65);
     const daysUntil = (turns65.getTime() - now.getTime()) / (24 * 60 * 60 * 1000);
-    if (daysUntil < 0 || daysUntil > TURNING_65_WINDOW_DAYS) continue; // margen fino (meses de 28-31 días) — el WHERE ya acotó lo grueso
+    if (daysUntil < 0 || daysUntil > windowDays) continue; // margen fino (meses de 28-31 días) — el WHERE ya acotó lo grueso
 
     pending.push({
       userId: c.agent.user.id,
@@ -245,10 +277,11 @@ async function scanTurning65(now: Date) {
 export async function scanAndGenerateNotifications() {
   const now = new Date();
   try {
-    await scanTasks(now);
-    await scanAppointments(now);
-    await scanTurning65(now);
-    await scanDocumentationPending(now);
+    const settings = await loadNotificationSettings();
+    await scanTasks(now, settings);
+    await scanAppointments(now, settings);
+    await scanTurning65(now, settings);
+    await scanDocumentationPending(now, settings);
   } catch (err) {
     // El scheduler nunca debe tirar abajo el server por un error de un
     // scan puntual — se loguea y se reintenta en el próximo ciclo.

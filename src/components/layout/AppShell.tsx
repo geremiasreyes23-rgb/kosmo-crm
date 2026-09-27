@@ -20,6 +20,7 @@ export function AppShell({
   profileData,
   messengerData,
   notificationData,
+  visibleModuleKeys,
 }: {
   children: ReactNode;
   user: SessionUser;
@@ -27,6 +28,10 @@ export function AppShell({
   profileData: ProfileViewData;
   messengerData: MessengerInitialData;
   notificationData: NotificationInitialData;
+  /** Qué módulos del Sidebar ve este usuario, según su rol — ver
+   * src/app/(app)/layout.tsx (de ahí sale calculado) y Configuración →
+   * Roles y permisos → "Visibilidad de módulos" (de ahí se edita). */
+  visibleModuleKeys: Set<string>;
 }) {
   return (
     // ToastNotificationProvider va afuera de todo — así tanto
@@ -49,9 +54,7 @@ export function AppShell({
               derecha el panel sigue llegando hasta el borde de la pantalla
               (sin esquinas redondeadas ahí) para no perder área útil. */}
           <div className="flex h-screen overflow-hidden" style={CHROME_GRADIENT_STYLE}>
-            <Sidebar
-              showReports={user.roleName === "Super Admin" || user.roleName === "Admin"}
-            />
+            <Sidebar visibleModuleKeys={visibleModuleKeys} />
             <div className="flex min-w-0 flex-1 flex-col">
               <Header user={user} initialTimeEntry={initialTimeEntry} profileData={profileData} />
               <main className="ml-2.5 mt-2.5 flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-[18px] bg-[var(--surface-page)] md:ml-3 md:mt-3">

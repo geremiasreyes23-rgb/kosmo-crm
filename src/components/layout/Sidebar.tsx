@@ -63,10 +63,16 @@ const RAIL_WIDTH = 72; // ancho recogido — solo íconos
 const FULL_WIDTH = 240; // ancho expandido — íconos + etiquetas
 const STORAGE_KEY = "kosmo:sidebar-collapsed";
 
-export function Sidebar({ showReports }: { showReports: boolean }) {
+export function Sidebar({ visibleModuleKeys }: { visibleModuleKeys: Set<string> }) {
   const pathname = usePathname();
   const { totalUnread } = useMessenger();
-  const visibleNavItems = showReports ? navItems : navItems.filter((item) => item.href !== "/reports");
+  // Antes solo "Reportes" tenía un chequeo de visibilidad (hardcodeado por
+  // nombre de rol en AppShell.tsx) — el resto de los módulos aparecía
+  // siempre, para cualquier rol, sin forma de cambiarlo. Ahora TODOS los
+  // módulos respetan RoleModuleVisibility (Configuración → Roles y
+  // permisos → "Visibilidad de módulos"), calculado en
+  // src/app/(app)/layout.tsx y pasado hasta acá.
+  const visibleNavItems = navItems.filter((item) => visibleModuleKeys.has(item.href));
   const [collapsed, setCollapsed] = useState(false);
   const [hovering, setHovering] = useState(false);
 

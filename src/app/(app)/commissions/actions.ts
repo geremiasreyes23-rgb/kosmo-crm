@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser, canViewAll, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { publishNotificationEvent } from "@/lib/notificationEvents";
 import type { CommissionStatus } from "@/types";
 
 export interface CommissionActionResult {
@@ -31,12 +32,20 @@ export async function updateCommissionStatusAction(
 
   const commission = await prisma.commission.findUnique({
     where: { id: commissionId },
-    include: { policy: true },
+    include: {
+      policy: {
+        include: {
+          client: { select: { firstName: true, lastName: true } },
+          agent: { include: { user: { include: { supervisor: true } } } },
+        },
+      },
+    },
   });
   if (!commission) return { ok: false, error: "La comisión ya no existe." };
   if (!canViewAll(user) && commission.policy.agentId !== user.agentId) {
     return { ok: false, error: "No puedes editar comisiones de otro vendedor." };
   }
+  const wasChargeback = commission.status === "CHARGEBACK";
 
   await prisma.commission.update({
     where: { id: commissionId },
@@ -54,6 +63,48 @@ export async function updateCommissionStatusAction(
     oldValue: commission.status,
     newValue: status,
   });
+
+  // Configuración → Notificaciones → "Chargeback de comisión" — antes esa
+  // fila del panel describía algo que nunca pasaba: ningún cambio de
+  // estado generaba una Notification real. Se dispara acá (evento puntual,
+  // como mail/messenger — no algo que notificationScheduler.ts tenga que
+  // "descubrir" re-escaneando la base) y respeta el toggle on/off del
+  // panel, no solo el mensajero de comisiones edit.
+  if (status === "CHARGEBACK" && !wasChargeback) {
+    const setting = await prisma.notificationSetting.findUnique({ where: { type: "chargeback" } });
+    if (setting?.enabled ?? true) {
+      const clientName = `${commission.policy.client.firstName} ${commission.policy.client.lastName}`;
+      const recipientUserIds = new Set<string>();
+      if (commission.policy.agent?.user) recipientUserIds.add(commission.policy.agent.user.id);
+      if (commission.policy.agent?.user?.supervisor) recipientUserIds.add(commission.policy.agent.user.supervisor.id);
+      for (const userId of recipientUserIds) {
+        const row = await prisma.notification.create({
+          data: {
+            userId,
+            type: "chargeback",
+            title: "Chargeback de comisión",
+            message: `La comisión de ${clientName} pasó a Chargeback`,
+            relatedEntityType: "Commission",
+            relatedEntityId: commissionId,
+          },
+        });
+        publishNotificationEvent({
+          type: "notification",
+          userId,
+          notification: {
+            id: row.id,
+            type: row.type,
+            title: row.title,
+            message: row.message,
+            relatedEntityType: row.relatedEntityType ?? undefined,
+            relatedEntityId: row.relatedEntityId ?? undefined,
+            isRead: row.isRead,
+            createdAt: row.createdAt.toISOString(),
+          },
+        });
+      }
+    }
+  }
 
   revalidatePath("/commissions");
   revalidatePath(`/clients/${commission.policy.clientId}`);
