@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Pin, X } from "lucide-react";
 import { cn, formatDayLabel } from "@/lib/utils";
+import { stickerPreviewGlyph, isImageSticker } from "@/data/messenger";
 import { ChatAvatar } from "./ChatAvatar";
 import { MessageBubble } from "./MessageBubble";
 import { MessageContextMenu, type MessageContextMenuState } from "./MessageContextMenu";
@@ -35,6 +36,7 @@ export function ChatPanel({
   onEditMessage,
   onDeleteMessage,
   onTogglePinMessage,
+  onReactMessage,
   onOpenProfile,
 }: {
   user: ChatUser | null;
@@ -53,6 +55,8 @@ export function ChatPanel({
   onEditMessage: (messageId: string, text: string) => void;
   onDeleteMessage: (messageId: string) => void;
   onTogglePinMessage: (messageId: string) => void;
+  /** Reacciona (o quita/cambia la reacción propia) a un mensaje. */
+  onReactMessage: (messageId: string, emoji: string) => void;
   /** Abre la ficha rápida de un compañero — encabezado del chat o una
    * mención dentro de un mensaje (ver UserProfileCard, en MessengerView). */
   onOpenProfile: (userId: string) => void;
@@ -101,7 +105,7 @@ export function ChatPanel({
       y: e.clientY,
       canEdit: isOwn && !message.sticker,
       canDelete: isOwn,
-      canCopy: !!(message.text || message.sticker),
+      canCopy: !!(message.text || (message.sticker && !isImageSticker(message.sticker))),
       pinned: !!message.pinned,
     });
   }
@@ -206,7 +210,12 @@ export function ChatPanel({
         >
           <Pin className="h-3.5 w-3.5 shrink-0" />
           <span className="min-w-0 flex-1 truncate">
-            {pinnedMessage.text || (pinnedMessage.sticker ? pinnedMessage.sticker : pinnedMessage.attachments?.length ? "📷 Foto" : "Mensaje fijado")}
+            {pinnedMessage.text ||
+              (pinnedMessage.sticker
+                ? `${stickerPreviewGlyph(pinnedMessage.sticker)} Sticker`
+                : pinnedMessage.attachments?.length
+                  ? "📷 Foto"
+                  : "Mensaje fijado")}
           </span>
           <span
             role="button"
@@ -265,6 +274,7 @@ export function ChatPanel({
                   <MessageBubble
                     message={message}
                     isOwn={message.senderId === currentUserId}
+                    currentUserId={currentUserId}
                     onImageClick={onImageClick}
                     onContextMenu={handleContextMenu}
                     isEditing={editingId === message.id}
@@ -275,6 +285,7 @@ export function ChatPanel({
                     onCancelEdit={() => setEditingId(null)}
                     mentionUsers={users}
                     onMentionClick={onOpenProfile}
+                    onReact={onReactMessage}
                   />
                 </div>
               );

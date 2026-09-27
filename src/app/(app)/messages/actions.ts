@@ -4,7 +4,9 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { publishMessengerEvent } from "@/lib/messengerEvents";
 import { publishNotificationEvent } from "@/lib/notificationEvents";
-import type { ChatMessage, NotificationVM, UserQuickProfileVM } from "@/types";
+import { groupReactions } from "@/lib/reactions";
+import { isUserOnline } from "@/lib/presence";
+import type { ChatMessage, MessageReactionGroup, NotificationVM, UserQuickProfileVM } from "@/types";
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
@@ -248,6 +250,74 @@ export async function deleteMessageAction(messageId: string): Promise<DeleteMess
   return { ok: true };
 }
 
+// ---------------------------------------------------------------------------
+// Reacciones (estilo WhatsApp/Messenger) — una sola reacción por persona y
+// mensaje. Reaccionar de nuevo con el MISMO emoji la quita; con uno
+// DISTINTO reemplaza la anterior (@@unique([messageId, userId]) en el
+// schema, ver toggleReactionAction). No requiere ser el remitente: ambos
+// participantes de la conversación pueden reaccionar a cualquier mensaje.
+// ---------------------------------------------------------------------------
+
+export type ToggleReactionResult =
+  | { ok: true; reactions: MessageReactionGroup[] }
+  | { ok: false; error: string };
+
+export async function toggleReactionAction(messageId: string, emoji: string): Promise<ToggleReactionResult> {
+  const user = await requireUser();
+
+  const trimmedEmoji = emoji.trim();
+  if (!trimmedEmoji) return { ok: false, error: "Emoji inválido." };
+
+  const existing = await prisma.message.findUnique({
+    where: { id: messageId },
+    select: {
+      id: true,
+      conversationId: true,
+      deletedAt: true,
+      conversation: { select: { userAId: true, userBId: true } },
+    },
+  });
+  if (!existing) return { ok: false, error: "Ese mensaje ya no existe." };
+  if (existing.deletedAt) return { ok: false, error: "No se puede reaccionar a un mensaje eliminado." };
+  const isParticipant = existing.conversation.userAId === user.id || existing.conversation.userBId === user.id;
+  if (!isParticipant) return { ok: false, error: "No tienes acceso a esta conversación." };
+
+  const myReaction = await prisma.messageReaction.findUnique({
+    where: { messageId_userId: { messageId, userId: user.id } },
+  });
+
+  if (myReaction && myReaction.emoji === trimmedEmoji) {
+    // Mismo emoji que ya tenía puesto — se quita (toggle off).
+    await prisma.messageReaction.delete({ where: { id: myReaction.id } });
+  } else {
+    // Sin reacción previa, o con una distinta — crea o reemplaza. Una sola
+    // reacción por persona y mensaje, igual que Messenger/WhatsApp (no
+    // "una de cada emoji" como Discord/Slack).
+    await prisma.messageReaction.upsert({
+      where: { messageId_userId: { messageId, userId: user.id } },
+      update: { emoji: trimmedEmoji },
+      create: { messageId, userId: user.id, emoji: trimmedEmoji },
+    });
+  }
+
+  const rows = await prisma.messageReaction.findMany({
+    where: { messageId },
+    orderBy: { createdAt: "asc" },
+    select: { emoji: true, userId: true },
+  });
+  const reactions = groupReactions(rows);
+
+  publishMessengerEvent({
+    type: "message-reaction",
+    conversationId: existing.conversationId,
+    participantIds: [existing.conversation.userAId, existing.conversation.userBId],
+    messageId,
+    reactions,
+  });
+
+  return { ok: true, reactions };
+}
+
 export type TogglePinResult = { ok: true; pinned: boolean } | { ok: false; error: string };
 
 export async function togglePinMessageAction(messageId: string): Promise<TogglePinResult> {
@@ -320,12 +390,18 @@ function formatBirthdayShort(date: Date | null): string | null {
 export async function getUserQuickProfileAction(userId: string): Promise<UserQuickProfileResult> {
   await requireUser();
 
-  const [row, activeSession, recognitionGroups] = await Promise.all([
+  // Presencia real por conexión SSE (ver src/lib/presence.ts) — NO
+  // "¿tiene una sesión sin vencer?" (una sesión dura hasta 14 días, ver
+  // SESSION_TTL_DAYS en auth.ts): con eso, cualquiera que se hubiera
+  // logueado en las últimas dos semanas aparecía "En línea" para siempre
+  // acá, aunque hubiera cerrado la pestaña hace días (bug real reportado:
+  // esta ficha rápida se había quedado con el chequeo viejo mientras el
+  // resto de Mensajería ya usaba la presencia real).
+  const [row, recognitionGroups] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       include: { role: true, supervisor: { select: { firstName: true, lastName: true } } },
     }),
-    prisma.session.findFirst({ where: { userId, expiresAt: { gt: new Date() } } }),
     prisma.recognition.groupBy({ by: ["type"], where: { toUserId: userId }, _count: true }),
   ]);
 
@@ -348,7 +424,7 @@ export async function getUserQuickProfileAction(userId: string): Promise<UserQui
     avatarUrl: row.avatarUrl,
     coverPhotoUrl: row.coverPhotoUrl,
     city: row.city,
-    status: activeSession ? "ONLINE" : "OFFLINE",
+    status: isUserOnline(userId) ? "ONLINE" : "OFFLINE",
     supervisorName: row.supervisor ? `${row.supervisor.firstName} ${row.supervisor.lastName}` : null,
     birthdayLabel: formatBirthdayShort(row.birthday),
     notificationLanguage: row.notificationLanguage,

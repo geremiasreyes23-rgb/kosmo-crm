@@ -315,6 +315,18 @@ export interface ChatMessage {
   /** Mensaje fijado de la conversación (uno solo a la vez, ver
    * togglePinMessageAction). */
   pinned?: boolean;
+  /** Reacciones agrupadas por emoji (ver toggleReactionAction) — undefined
+   * o [] = sin reacciones. Una sola reacción por persona: si un userId ya
+   * aparece en otro grupo, el server ya lo quitó de ahí al reasignarla. */
+  reactions?: MessageReactionGroup[];
+}
+
+/** Un grupo de reacciones iguales sobre un mensaje — cuántos y quiénes
+ * reaccionaron con ESE emoji puntual. Ver src/lib/reactions.ts (agrupa las
+ * filas sueltas de MessageReaction) y toggleReactionAction. */
+export interface MessageReactionGroup {
+  emoji: string;
+  userIds: string[];
 }
 
 /** Fila del modelo Notification, tal como la ve el cliente — ver

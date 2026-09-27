@@ -9,12 +9,14 @@ import {
   editMessageAction,
   deleteMessageAction,
   togglePinMessageAction,
+  toggleReactionAction,
 } from "@/app/(app)/messages/actions";
-import type { ChatConversation, ChatMessage, ChatUser } from "@/types";
+import type { ChatConversation, ChatMessage, ChatUser, MessageReactionGroup } from "@/types";
 import type { ComposerSendPayload } from "./ChatComposer";
 import type { MessengerInitialData } from "@/app/(app)/messages/data";
 import { useNotifyToast } from "@/components/notifications/ToastNotificationProvider";
 import { playSound } from "@/lib/sounds";
+import { isConversationMuted } from "@/lib/mutedConversations";
 
 interface MessengerContextValue {
   currentUser: ChatUser;
@@ -34,6 +36,9 @@ interface MessengerContextValue {
   editMessage: (messageId: string, text: string) => void;
   deleteMessage: (messageId: string) => void;
   togglePinMessage: (messageId: string) => void;
+  /** Reacciona (o quita/cambia tu reacción) a un mensaje — una sola
+   * reacción por persona, ver toggleReactionAction. */
+  reactToMessage: (messageId: string, emoji: string) => void;
   getChatUser: (id: string) => ChatUser;
 }
 
@@ -156,6 +161,11 @@ export function MessengerProvider({
         if (message.senderId !== currentUserId) {
           const isViewingThisConversation =
             pathnameRef.current === "/messages" && selectedIdRef.current === conversationId;
+          // Silenciada por el usuario (ver el panel de contacto,
+          // "Silenciar notificaciones") — el mensaje se recibe y cuenta
+          // como no leído igual que siempre (ver setUnreadByConv arriba,
+          // no depende de esto), solo se suprime el aviso emergente.
+          const muted = isConversationMuted(conversationId);
 
           // Sonido — un solo timbre por mensaje recibido, elegido con la
           // misma condición de arriba: si ya se está viendo esta
@@ -163,9 +173,11 @@ export function MessengerProvider({
           // ("chat activo"); si no, el normal. NotificationProvider nunca
           // reproduce sonido para mensajes (ver shouldPlaySoundHere ahí),
           // así que nunca suenan los dos a la vez para el mismo evento.
-          playSound(isViewingThisConversation ? "messageActive" : "message");
+          if (!muted) {
+            playSound(isViewingThisConversation ? "messageActive" : "message");
+          }
 
-          if (!isViewingThisConversation) {
+          if (!isViewingThisConversation && !muted) {
             const sender = getChatUser(message.senderId);
             const preview = message.text
               ? message.text
@@ -211,6 +223,7 @@ export function MessengerProvider({
           sticker: undefined,
           attachments: undefined,
           pinned: undefined,
+          reactions: undefined,
           deletedAt: payload.deletedAt as string,
         });
       } else if (payload.type === "presence") {
@@ -223,6 +236,12 @@ export function MessengerProvider({
           if (online) next.add(userId);
           else next.delete(userId);
           return next;
+        });
+      } else if (payload.type === "message-reaction") {
+        const conversationId = payload.conversationId as string;
+        const messageId = payload.messageId as string;
+        patchMessage(conversationId, messageId, {
+          reactions: payload.reactions as MessageReactionGroup[],
         });
       } else if (payload.type === "message-pinned") {
         const conversationId = payload.conversationId as string;
@@ -350,6 +369,7 @@ export function MessengerProvider({
       sticker: undefined,
       attachments: undefined,
       pinned: undefined,
+      reactions: undefined,
       deletedAt: new Date().toISOString(),
     });
     const result = await deleteMessageAction(messageId);
@@ -383,6 +403,47 @@ export function MessengerProvider({
     }
   }
 
+  async function reactToMessage(messageId: string, emoji: string) {
+    if (!selectedId) return;
+    const conv = messagesByConv[selectedId] ?? [];
+    const current = conv.find((m) => m.id === messageId);
+    if (!current) return;
+
+    const existingGroups = current.reactions ?? [];
+    const myExisting = existingGroups.find((g) => g.userIds.includes(currentUserId));
+
+    // Optimista — calcula cómo quedarían los grupos localmente antes de
+    // esperar la respuesta del server (mismo patrón que
+    // togglePinMessage/deleteMessage más abajo).
+    let optimistic: MessageReactionGroup[];
+    if (myExisting && myExisting.emoji === emoji) {
+      // Mismo emoji que ya tenía puesto — se quita.
+      optimistic = existingGroups
+        .map((g) => (g.emoji === emoji ? { ...g, userIds: g.userIds.filter((id) => id !== currentUserId) } : g))
+        .filter((g) => g.userIds.length > 0);
+    } else {
+      // Sin reacción previa, o con una distinta — se saca de donde estaba
+      // (si estaba) y se agrega en el nuevo grupo (creándolo si no existía).
+      const withoutMine = existingGroups
+        .map((g) => ({ ...g, userIds: g.userIds.filter((id) => id !== currentUserId) }))
+        .filter((g) => g.userIds.length > 0);
+      const alreadyHasGroup = withoutMine.some((g) => g.emoji === emoji);
+      optimistic = alreadyHasGroup
+        ? withoutMine.map((g) => (g.emoji === emoji ? { ...g, userIds: [...g.userIds, currentUserId] } : g))
+        : [...withoutMine, { emoji, userIds: [currentUserId] }];
+    }
+
+    patchMessage(selectedId, messageId, { reactions: optimistic });
+
+    const result = await toggleReactionAction(messageId, emoji);
+    if (result.ok) {
+      patchMessage(selectedId, messageId, { reactions: result.reactions });
+    } else {
+      patchMessage(selectedId, messageId, { reactions: existingGroups });
+      setSendError(result.error);
+    }
+  }
+
   const value: MessengerContextValue = {
     currentUser: initialData.currentUser,
     users: initialData.users,
@@ -398,6 +459,7 @@ export function MessengerProvider({
     editMessage,
     deleteMessage,
     togglePinMessage,
+    reactToMessage,
     getChatUser,
   };
 

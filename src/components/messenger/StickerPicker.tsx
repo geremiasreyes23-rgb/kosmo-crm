@@ -37,15 +37,16 @@ export function StickerPicker({
         {stickerCategories.map((cat) => (
           <div key={cat.label}>
             <p className="mb-1 px-0.5 text-[11px] font-medium text-[var(--ink-muted)]">{cat.label}</p>
-            <div className="grid grid-cols-8 gap-1">
-              {cat.stickers.map((emoji) => (
+            <div className="grid grid-cols-5 gap-1">
+              {cat.stickers.map((sticker) => (
                 <button
-                  key={emoji}
+                  key={sticker}
                   type="button"
-                  onClick={() => onSelect(emoji)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-xl transition-transform hover:scale-125 hover:bg-[var(--surface-hover)] active:scale-95"
+                  onClick={() => onSelect(sticker)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg transition-transform hover:scale-125 hover:bg-[var(--surface-hover)] active:scale-95"
                 >
-                  {emoji}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={sticker} alt="" className="h-7 w-7 object-contain" />
                 </button>
               ))}
             </div>

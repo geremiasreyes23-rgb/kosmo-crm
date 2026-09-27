@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent } from "react";
-import { Image as ImageIcon, Send, Smile, X } from "lucide-react";
+import { Image as ImageIcon, Send, Smile, SmilePlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { detectMentionTrigger, type MentionUser } from "@/lib/mentions";
 import { StickerPicker } from "./StickerPicker";
+import { EmojiPicker } from "./EmojiPicker";
 import { ChatAvatar } from "./ChatAvatar";
 import type { ChatUser } from "@/types";
 
@@ -39,6 +40,7 @@ export function ChatComposer({
   const [text, setText] = useState("");
   const [pending, setPending] = useState<ComposerAttachment[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -259,6 +261,23 @@ export function ChatComposer({
     setPickerOpen(false);
   }
 
+  // Inserta el emoji elegido en el punto donde estaba el cursor (mismo
+  // patrón que selectMention más arriba), en vez de pegarlo siempre al
+  // final del texto — así se puede seguir escribiendo antes o después de
+  // un emoji ya insertado.
+  function insertEmoji(native: string) {
+    const cursor = textInputRef.current?.selectionStart ?? text.length;
+    const before = text.slice(0, cursor);
+    const after = text.slice(cursor);
+    const nextText = `${before}${native}${after}`;
+    setText(nextText);
+    const nextCursor = before.length + native.length;
+    requestAnimationFrame(() => {
+      textInputRef.current?.focus();
+      textInputRef.current?.setSelectionRange(nextCursor, nextCursor);
+    });
+  }
+
   return (
     <div
       // El fondo (color elegido o textura por defecto) ya lo pinta el
@@ -345,6 +364,31 @@ export function ChatComposer({
         >
           <ImageIcon className="h-4.5 w-4.5" />
         </button>
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setEmojiPickerOpen((v) => !v)}
+            title="Emojis"
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors active:scale-95",
+              emojiPickerOpen
+                ? "bg-[var(--brand-50)] text-[var(--brand-600)]"
+                : "text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)]"
+            )}
+          >
+            <SmilePlus className="h-4.5 w-4.5" />
+          </button>
+          {emojiPickerOpen && (
+            <EmojiPicker
+              onSelect={(native) => {
+                insertEmoji(native);
+                setEmojiPickerOpen(false);
+              }}
+              onClose={() => setEmojiPickerOpen(false)}
+            />
+          )}
+        </div>
 
         <div className="relative">
           <button

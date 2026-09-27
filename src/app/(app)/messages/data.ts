@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { avatarColorFromId } from "@/lib/utils";
 import type { SessionUser } from "@/lib/auth";
 import { getOnlineUserIds } from "@/lib/presence";
+import { groupReactions } from "@/lib/reactions";
 import type { ChatConversation, ChatMessage, ChatUser } from "@/types";
 
 export interface MessengerInitialData {
@@ -52,7 +53,7 @@ export async function getMessengerViewData(sessionUser: SessionUser): Promise<Me
     prisma.conversation.findMany({
       where: { OR: [{ userAId: sessionUser.id }, { userBId: sessionUser.id }] },
       include: {
-        messages: { orderBy: { sentAt: "asc" } },
+        messages: { orderBy: { sentAt: "asc" }, include: { reactions: true } },
         reads: true,
       },
     }),
@@ -112,6 +113,10 @@ export async function getMessengerViewData(sessionUser: SessionUser): Promise<Me
       editedAt: m.editedAt ? m.editedAt.toISOString() : undefined,
       deletedAt: m.deletedAt ? m.deletedAt.toISOString() : undefined,
       pinned: m.pinned || undefined,
+      // Igual que text/sticker arriba: un mensaje eliminado no manda sus
+      // reacciones al cliente (la burbuja ni siquiera las muestra).
+      reactions:
+        m.deletedAt || m.reactions.length === 0 ? undefined : groupReactions(m.reactions),
     }));
 
     unreadByConv[conv.id] = conv.messages.filter(

@@ -1,6 +1,6 @@
 import "server-only";
 import { EventEmitter } from "events";
-import type { ChatMessage } from "@/types";
+import type { ChatMessage, MessageReactionGroup } from "@/types";
 
 /**
  * Bus de eventos en memoria para el chat en tiempo real — cuando alguien
@@ -76,6 +76,17 @@ export interface MessengerMessagePinnedEvent {
   pinnedAt: string | null;
 }
 
+export interface MessengerReactionEvent {
+  type: "message-reaction";
+  conversationId: string;
+  participantIds: [string, string];
+  messageId: string;
+  /** Ya agrupadas por emoji — ver src/lib/reactions.ts — así el cliente
+   * simplemente reemplaza message.reactions con esto, sin tener que
+   * reconstruir el agrupado a partir de filas sueltas. */
+  reactions: MessageReactionGroup[];
+}
+
 /** A diferencia de los demás eventos (que solo le interesan a los dos
  * participantes de una conversación puntual, ver participantIds), la
  * presencia le interesa a CUALQUIERA que tenga a esa persona en su lista de
@@ -93,7 +104,8 @@ export type MessengerEvent =
   | MessengerReadEvent
   | MessengerMessageEditedEvent
   | MessengerMessageDeletedEvent
-  | MessengerMessagePinnedEvent;
+  | MessengerMessagePinnedEvent
+  | MessengerReactionEvent;
 
 const CHANNEL = "messenger";
 const PRESENCE_CHANNEL = "messenger-presence";

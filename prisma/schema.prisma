@@ -99,6 +99,7 @@ model User {
   conversationsAsA      Conversation[] @relation("ConversationUserA")
   conversationsAsB      Conversation[] @relation("ConversationUserB")
   messagesSent          Message[]      @relation("MessagesSent")
+  messageReactions      MessageReaction[] @relation("MessageReactions")
   conversationReads     ConversationRead[] @relation("ConversationReads")
 
   // Correo interno (sección 15) — un usuario tiene a lo sumo un buzón, creado
@@ -1185,8 +1186,28 @@ model Message {
   pinned         Boolean      @default(false)
   pinnedAt       DateTime?
 
+  reactions      MessageReaction[]
+
   @@index([conversationId, sentAt])
   @@index([conversationId, pinned])
+}
+
+// Reacciones a mensajes (estilo WhatsApp/Messenger) — una sola reacción por
+// persona y mensaje (@@unique abajo): reaccionar de nuevo con un emoji
+// distinto reemplaza la anterior, y repetir el mismo emoji la quita (ver
+// toggleReactionAction). El cliente las recibe agrupadas por emoji
+// (src/lib/reactions.ts), nunca fila por fila.
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("MessageReactions", fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId])
+  @@index([messageId])
 }
 
 // Marca de "leído hasta" por usuario y conversación — reemplaza al viejo

@@ -1,14 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
-import { Ban, Check, CheckCheck, Pin } from "lucide-react";
+import { Ban, Check, CheckCheck, Pin, SmilePlus } from "lucide-react";
 import { cn, formatTime } from "@/lib/utils";
 import { splitMentions, type MentionUser } from "@/lib/mentions";
-import type { ChatMessage } from "@/types";
+import { renderTextWithEmoji } from "@/lib/emojiText";
+import { Emoji } from "./Emoji";
+import { ReactionPicker } from "./ReactionPicker";
+import { isImageSticker } from "@/data/messenger";
+import type { ChatMessage, MessageReactionGroup } from "@/types";
 
 export function MessageBubble({
   message,
   isOwn,
+  currentUserId,
   onImageClick,
   onContextMenu,
   isEditing,
@@ -16,9 +21,14 @@ export function MessageBubble({
   onCancelEdit,
   mentionUsers,
   onMentionClick,
+  onReact,
 }: {
   message: ChatMessage;
   isOwn: boolean;
+  /** Quién está mirando el chat — determina si UNA reacción puntual (no
+   * necesariamente todo el mensaje, que puede ser de la otra persona) es
+   * "mía" para resaltar la píldora y saber qué pasa al tocarla de nuevo. */
+  currentUserId: string;
   onImageClick: (url: string) => void;
   /** Clic derecho sobre la burbuja — ChatPanel decide qué opciones mostrar
    * (editar/eliminar solo si es propio, copiar/fijar siempre) y abre el menú. */
@@ -32,10 +42,13 @@ export function MessageBubble({
   mentionUsers: MentionUser[];
   /** Clic sobre una mención reconocida — abre la ficha rápida de esa persona. */
   onMentionClick: (userId: string) => void;
+  /** Reacciona (o quita/cambia la reacción propia) a este mensaje. */
+  onReact: (messageId: string, emoji: string) => void;
 }) {
   const isSticker = !!message.sticker;
   const hasAttachments = !!message.attachments?.length;
   const isDeleted = !!message.deletedAt;
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
 
   if (isDeleted) {
     return (
@@ -53,10 +66,43 @@ export function MessageBubble({
     );
   }
 
+  function handleReact(emoji: string) {
+    onReact(message.id, emoji);
+    setReactionPickerOpen(false);
+  }
+
+  const reactTrigger = (
+    <div className="relative shrink-0 self-end pb-1">
+      {/* Solo aparece al pasar el mouse sobre el mensaje (group-hover, ver
+          el div padre) — no ocupa espacio visual en reposo. Se mantiene
+          visible mientras el selector está abierto, aunque el mouse ya no
+          esté encima, para no cerrarlo de golpe al mover el cursor hacia
+          los emojis. */}
+      <button
+        type="button"
+        onClick={() => setReactionPickerOpen((v) => !v)}
+        title="Reaccionar"
+        className={cn(
+          "flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-secondary)] transition-opacity hover:bg-[var(--surface-hover)] active:scale-95",
+          reactionPickerOpen ? "bg-[var(--surface-hover)] opacity-100" : "opacity-0 group-hover:opacity-100"
+        )}
+      >
+        <SmilePlus className="h-4 w-4" />
+      </button>
+      {reactionPickerOpen && (
+        <ReactionPicker
+          align={isOwn ? "end" : "start"}
+          onSelect={handleReact}
+          onClose={() => setReactionPickerOpen(false)}
+        />
+      )}
+    </div>
+  );
+
   return (
     <div
       className={cn(
-        "group flex animate-kosmo-fade-in-up",
+        "group flex items-end gap-1 animate-kosmo-fade-in-up",
         isOwn ? "justify-end" : "justify-start"
       )}
       onContextMenu={(e) => {
@@ -64,6 +110,7 @@ export function MessageBubble({
         onContextMenu(e, message);
       }}
     >
+      {!isOwn && reactTrigger}
       <div className={cn("flex max-w-[78%] flex-col gap-1", isOwn ? "items-end" : "items-start")}>
         {message.pinned && (
           <span className="flex items-center gap-1 text-[10px] font-medium text-[var(--brand-500)]">
@@ -72,7 +119,14 @@ export function MessageBubble({
         )}
         {isSticker ? (
           <div className="flex flex-col items-end gap-0.5">
-            <span className="text-[56px] leading-none">{message.sticker}</span>
+            {isImageSticker(message.sticker!) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={message.sticker} alt="Sticker" className="h-24 w-24 object-contain" />
+            ) : (
+              // Formato viejo: un emoji unicode suelto, de antes del pack
+              // ilustrado — se sigue mostrando igual que siempre.
+              <Emoji native={message.sticker!} size={56} />
+            )}
             <MessageMeta message={message} isOwn={isOwn} transparent />
           </div>
         ) : isEditing ? (
@@ -119,7 +173,7 @@ export function MessageBubble({
                       {part.text}
                     </button>
                   ) : (
-                    <span key={idx}>{part.text}</span>
+                    <span key={idx}>{renderTextWithEmoji(part.text, `m${idx}`)}</span>
                   )
                 )}
               </p>
@@ -127,7 +181,48 @@ export function MessageBubble({
             <MessageMeta message={message} isOwn={isOwn} />
           </div>
         )}
+        {!!message.reactions?.length && (
+          <ReactionPills reactions={message.reactions} currentUserId={currentUserId} isOwn={isOwn} onToggle={handleReact} />
+        )}
       </div>
+      {isOwn && reactTrigger}
+    </div>
+  );
+}
+
+function ReactionPills({
+  reactions,
+  currentUserId,
+  isOwn,
+  onToggle,
+}: {
+  reactions: MessageReactionGroup[];
+  currentUserId: string;
+  isOwn: boolean;
+  onToggle: (emoji: string) => void;
+}) {
+  return (
+    <div className={cn("flex flex-wrap gap-1", isOwn ? "justify-end" : "justify-start")}>
+      {reactions.map((group) => {
+        const mine = group.userIds.includes(currentUserId);
+        return (
+          <button
+            key={group.emoji}
+            type="button"
+            onClick={() => onToggle(group.emoji)}
+            title={mine ? "Quitar tu reacción" : "Reaccionar igual"}
+            className={cn(
+              "flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] leading-none transition-colors active:scale-95",
+              mine
+                ? "border-[var(--brand-500)] bg-[var(--brand-50)] text-[var(--brand-600)]"
+                : "border-[var(--border-hairline)] bg-[var(--surface-card)] text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)]"
+            )}
+          >
+            <Emoji native={group.emoji} size={13} />
+            <span className="font-medium">{group.userIds.length}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

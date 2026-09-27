@@ -2,6 +2,7 @@
 
 import { Search, SquarePen } from "lucide-react";
 import { cn, formatTime } from "@/lib/utils";
+import { stickerPreviewGlyph } from "@/data/messenger";
 import { ChatAvatar } from "./ChatAvatar";
 import type { ChatConversation, ChatMessage, ChatUser } from "@/types";
 
@@ -15,7 +16,7 @@ export interface ConversationSummary {
 function lastMessagePreview(message?: ChatMessage, isOwn?: boolean): string {
   if (!message) return "Sin mensajes todavía";
   const prefix = isOwn ? "Tú: " : "";
-  if (message.sticker) return `${prefix}${message.sticker} Sticker`;
+  if (message.sticker) return `${prefix}${stickerPreviewGlyph(message.sticker)} Sticker`;
   if (message.attachments?.length) return `${prefix}📷 Foto`;
   return `${prefix}${message.text ?? ""}`;
 }

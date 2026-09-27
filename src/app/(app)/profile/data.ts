@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/db";
 import { formatRelativeTime } from "@/lib/utils";
+import { isUserOnline } from "@/lib/presence";
 import type { SessionUser } from "@/lib/auth";
 import type { RecognitionType } from "@prisma/client";
 
@@ -99,7 +100,7 @@ function auditRowToActivity(row: {
  * AuditLog cubriendo más módulos), solo se toca este archivo.
  */
 export async function getProfileViewData(sessionUser: SessionUser): Promise<ProfileViewData> {
-  const [user, recognitionGroups, auditRows, activeSession] = await Promise.all([
+  const [user, recognitionGroups, auditRows] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: sessionUser.id },
       select: {
@@ -128,7 +129,6 @@ export async function getProfileViewData(sessionUser: SessionUser): Promise<Prof
       take: 8,
       select: { entityType: true, fieldName: true, createdAt: true },
     }),
-    prisma.session.findFirst({ where: { userId: sessionUser.id, expiresAt: { gt: new Date() } } }),
   ]);
 
   const countByType = new Map(recognitionGroups.map((g) => [g.type, g._count]));
@@ -173,7 +173,10 @@ export async function getProfileViewData(sessionUser: SessionUser): Promise<Prof
     avatarUrl: user.avatarUrl,
     coverPhotoUrl: user.coverPhotoUrl,
     jobTitle: user.jobTitle,
-    online: !!activeSession,
+    // Presencia real por conexión SSE (ver src/lib/presence.ts), igual
+    // que el resto de Mensajería — no "¿tiene una sesión sin vencer?"
+    // (hasta 14 días, ver SESSION_TTL_DAYS en auth.ts).
+    online: isUserOnline(sessionUser.id),
     lastActiveLabel: formatRelativeTime(lastLogin.toISOString()),
     contactFields,
     recognitionCounts,

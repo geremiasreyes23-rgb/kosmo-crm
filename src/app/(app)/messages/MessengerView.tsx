@@ -23,6 +23,7 @@ export function MessengerView() {
     editMessage,
     deleteMessage,
     togglePinMessage,
+    reactToMessage,
     getChatUser,
   } = useMessenger();
 
@@ -59,6 +60,16 @@ export function MessengerView() {
   const selectedUser = selectedConversation ? getChatUser(selectedConversation.userId) : null;
   const selectedMessages = selectedId ? messagesByConv[selectedId] ?? [] : [];
 
+  // La conversación DEL PERFIL que se está mostrando — no necesariamente
+  // la seleccionada: se puede abrir este panel con clic derecho desde la
+  // lista de conversaciones sin cambiar de chat activo (ver
+  // ConversationList, onViewProfile). De acá salen los archivos
+  // compartidos, la búsqueda y el silenciado del panel de contacto.
+  const profileConversation = profileUserId
+    ? conversations.find((c) => c.userId === profileUserId) ?? null
+    : null;
+  const profileMessages = profileConversation ? messagesByConv[profileConversation.id] ?? [] : [];
+
   const usersWithoutConversation = users.filter(
     (u) => !conversations.some((c) => c.userId === u.id)
   );
@@ -84,7 +95,7 @@ export function MessengerView() {
           ni padding del layout (ver MainFrame) — el panel de chat cubre el
           <main> completo, a borde a borde, en vez de flotar como una tarjeta
           con un marco blanco alrededor. */}
-      <div className="flex min-h-0 flex-1 overflow-hidden bg-[var(--surface-card)]">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden bg-[var(--surface-card)]">
         <div className={mobileShowChat ? "hidden md:flex md:h-full" : "flex h-full w-full md:w-auto md:flex"}>
           <ConversationList
             items={summaries}
@@ -119,9 +130,19 @@ export function MessengerView() {
             onEditMessage={editMessage}
             onDeleteMessage={deleteMessage}
             onTogglePinMessage={togglePinMessage}
+            onReactMessage={reactToMessage}
             onOpenProfile={setProfileUserId}
           />
         </div>
+
+        <UserProfileCard
+          userId={profileUserId}
+          onClose={() => setProfileUserId(null)}
+          currentUserId={currentUser.id}
+          conversationId={profileConversation?.id ?? null}
+          messages={profileMessages}
+          onImageClick={setLightboxUrl}
+        />
       </div>
 
       <NewChatModal
@@ -130,8 +151,6 @@ export function MessengerView() {
         availableUsers={usersWithoutConversation}
         onPick={handlePick}
       />
-
-      <UserProfileCard userId={profileUserId} onClose={() => setProfileUserId(null)} currentUserId={currentUser.id} />
 
       {lightboxUrl && (
         <div
