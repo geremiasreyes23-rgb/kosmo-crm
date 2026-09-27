@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { MessageCircle, Pin, X } from "lucide-react";
+import { Pin, X } from "lucide-react";
 import { cn, formatDayLabel } from "@/lib/utils";
 import { ChatAvatar } from "./ChatAvatar";
 import { MessageBubble } from "./MessageBubble";
@@ -125,11 +125,27 @@ export function ChatPanel({
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  // Estado inicial de Mensajería (ningún chat seleccionado todavía) — ver
+  // MessengerProvider, selectedId arranca en null a propósito, nunca en el
+  // primer chat de la lista. Mismo lenguaje visual del resto del CRM (sin
+  // fondo/tarjeta propios, tipografía y colores existentes) y la misma
+  // animación de entrada ya usada en otros paneles (kosmo-fade-in-up,
+  // definida en globals.css) — nada nuevo, solo reutilizado.
   if (!user) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 text-[var(--ink-muted)]">
-        <MessageCircle className="h-10 w-10" />
-        <p className="text-sm">Selecciona una conversación para empezar a chatear.</p>
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/messenger-welcome.png"
+          alt=""
+          className="animate-kosmo-fade-in-up h-24 w-auto object-contain"
+        />
+        <div className="animate-kosmo-fade-in-up">
+          <p className="text-sm font-semibold text-[var(--ink-primary)]">Selecciona una conversación</p>
+          <p className="mt-1 text-xs text-[var(--ink-muted)]">
+            Elige un chat de la lista para comenzar a conversar.
+          </p>
+        </div>
       </div>
     );
   }

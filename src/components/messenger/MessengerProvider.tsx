@@ -50,7 +50,16 @@ export function MessengerProvider({
   const [conversations, setConversations] = useState<ChatConversation[]>(initialData.conversations);
   const [messagesByConv, setMessagesByConv] = useState<Record<string, ChatMessage[]>>(initialData.messagesByConv);
   const [unreadByConv, setUnreadByConv] = useState<Record<string, number>>(initialData.unreadByConv);
-  const [selectedId, setSelectedId] = useState<string | null>(initialData.conversations[0]?.id ?? null);
+  // Pedido explícito: nunca seleccionar automáticamente el primer chat
+  // al entrar a Mensajería (antes: initialData.conversations[0]?.id ??
+  // null). El estado inicial es siempre null, sin importar cuántas
+  // conversaciones existan — ChatPanel ya sabía mostrar una pantalla de
+  // bienvenida cuando no hay usuario seleccionado (ver el caso `!user`
+  // ahí), así que este cambio es puramente de estado inicial. La única
+  // forma de que se abra una conversación sigue siendo selectConversation()
+  // — un clic en la lista, o el onClick de una notificación en vivo más
+  // abajo — nunca un fallback automático.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const selectedIdRef = useRef(selectedId);
   const currentUserId = initialData.currentUser.id;
