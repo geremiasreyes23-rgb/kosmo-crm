@@ -14,6 +14,7 @@ import type { ChatConversation, ChatMessage, ChatUser } from "@/types";
 import type { ComposerSendPayload } from "./ChatComposer";
 import type { MessengerInitialData } from "@/app/(app)/messages/data";
 import { useNotifyToast } from "@/components/notifications/ToastNotificationProvider";
+import { playSound } from "@/lib/sounds";
 
 interface MessengerContextValue {
   currentUser: ChatUser;
@@ -155,6 +156,15 @@ export function MessengerProvider({
         if (message.senderId !== currentUserId) {
           const isViewingThisConversation =
             pathnameRef.current === "/messages" && selectedIdRef.current === conversationId;
+
+          // Sonido — un solo timbre por mensaje recibido, elegido con la
+          // misma condición de arriba: si ya se está viendo esta
+          // conversación puntual, el aviso sonoro es el más discreto
+          // ("chat activo"); si no, el normal. NotificationProvider nunca
+          // reproduce sonido para mensajes (ver shouldPlaySoundHere ahí),
+          // así que nunca suenan los dos a la vez para el mismo evento.
+          playSound(isViewingThisConversation ? "messageActive" : "message");
+
           if (!isViewingThisConversation) {
             const sender = getChatUser(message.senderId);
             const preview = message.text

@@ -8,14 +8,15 @@ import { useNotifyToast } from "@/components/notifications/ToastNotificationProv
 import type { NotificationVM } from "@/types";
 import type { NotificationInitialData } from "@/app/(app)/notifications/data";
 
-/** Mapea el `type` de la notificación al timbre a reproducir — ver
- * src/lib/sounds.ts. Todo lo que no sea correo interno o mensaje de
- * Mensajería (tareas, citas, Turning 65) usa el sonido de notificación
- * genérica. */
-function soundForNotification(type: string): "message" | "mail" | "notification" {
-  if (type === "internal_message") return "message";
-  if (type === "internal_mail") return "mail";
-  return "notification";
+/** Mensajes de Mensajería NO reproducen sonido acá — lo decide
+ * MessengerProvider, que es el único lugar que sabe si el usuario ya está
+ * viendo esa conversación puntual ahora mismo (para elegir entre el sonido
+ * normal y el más discreto de "chat activo"). Reproducirlo también acá
+ * duplicaría el sonido del mismo evento. Todo lo demás (tareas, citas,
+ * Turning 65, correo interno) usa el sonido de notificación genérica — ver
+ * src/lib/sounds.ts. */
+function shouldPlaySoundHere(type: string): boolean {
+  return type !== "internal_message";
 }
 
 interface NotificationContextValue {
@@ -59,7 +60,7 @@ export function NotificationProvider({
           return [notification, ...prev].slice(0, 30);
         });
         setUnreadCount((prev) => prev + 1);
-        playSound(soundForNotification(notification.type));
+        if (shouldPlaySoundHere(notification.type)) playSound("notification");
 
         // Notificación emergente — los mensajes de Mensajería ya se
         // muestran (con foto y el texto real) desde MessengerProvider, que
