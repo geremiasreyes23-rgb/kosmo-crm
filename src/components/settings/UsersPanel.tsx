@@ -148,7 +148,7 @@ export function UsersPanel({
     <div>
       <div className="mb-3 flex items-center justify-between">
         <p className="text-xs text-[var(--ink-muted)]">
-          {initialUsers.length} usuario{initialUsers.length === 1 ? "" : "s"} — crea, edita o desactiva accesos
+          {initialUsers.length} usuario{initialUsers.length === 1 ? "" : "s"}. Crea, edita o desactiva accesos
           según entre y salga personal del call center.
         </p>
         <Button size="sm" onClick={openCreate}>
@@ -246,7 +246,7 @@ export function UsersPanel({
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         title={editingUser ? "Editar usuario" : "Nuevo usuario"}
-        description={editingUser ? undefined : "Se genera una contraseña temporal — el usuario la cambia en su primer ingreso."}
+        description={editingUser ? undefined : "Se genera una contraseña temporal. El usuario la cambia en su primer ingreso."}
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -295,7 +295,7 @@ export function UsersPanel({
         {credentials && (
           <div className="space-y-3">
             <p className="text-sm text-[var(--ink-secondary)]">
-              Comparte estos datos con <span className="font-medium">{credentials.name}</span> — la contraseña
+              Comparte estos datos con <span className="font-medium">{credentials.name}</span>. La contraseña
               no se volverá a mostrar. Se le pedirá cambiarla en su primer ingreso.
             </p>
             <div className="space-y-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-sunken)] p-3 text-sm">
@@ -335,12 +335,12 @@ export function UsersPanel({
               {confirming.type === "delete" ? (
                 <>
                   ¿Eliminar a <span className="font-medium">{confirming.user.firstName} {confirming.user.lastName}</span> permanentemente?
-                  Si tiene historial en el sistema (leads, ventas, auditoría), no se podrá eliminar — desactívalo en su lugar.
+                  Si tiene historial en el sistema (leads, ventas, auditoría), no se podrá eliminar. Desactívalo en su lugar.
                 </>
               ) : (
                 <>
                   ¿Desactivar a <span className="font-medium">{confirming.user.firstName} {confirming.user.lastName}</span>?
-                  Perderá acceso de inmediato — su sesión activa se cierra y no podrá volver a ingresar hasta que lo actives de nuevo.
+                  Perderá acceso de inmediato. Su sesión activa se cierra y no podrá volver a ingresar hasta que lo actives de nuevo.
                 </>
               )}
             </p>

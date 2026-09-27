@@ -75,7 +75,7 @@ const EXTRA_LABEL: Record<string, string> = {
 
 const ROLE_DESCRIPTION_FALLBACK: Record<string, string> = {
   "Super Admin": "Acceso total al sistema, incluida la gestión de usuarios y roles",
-  Admin: "Administración del CRM — usuarios, configuración, todos los módulos",
+  Admin: "Administración del CRM: usuarios, configuración, todos los módulos",
   Manager: "Visualización y administración de su equipo",
   Agent: "Acceso a sus propios leads, clientes, ventas y actividades",
   Viewer: "Solo lectura",
@@ -169,7 +169,7 @@ export function RolePermissionsPanel({
       {isSuperAdmin && (
         <div className="flex items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-sunken)] px-3 py-2.5 text-sm text-[var(--ink-secondary)]">
           <ShieldCheck className="h-4 w-4 shrink-0" />
-          Super Admin tiene acceso total por diseño y siempre ve todos los módulos — no depende de esta tabla,
+          Super Admin tiene acceso total por diseño y siempre ve todos los módulos. No depende de esta tabla,
           así que no es editable.
         </div>
       )}
@@ -258,7 +258,7 @@ export function RolePermissionsPanel({
           <div>
             <h3 className="mb-2 text-sm font-semibold">Visibilidad de módulos (menú lateral)</h3>
             <p className="mb-2 text-xs text-[var(--ink-muted)]">
-              Controla qué aparece en el menú de la izquierda para este rol — independiente de los permisos de
+              Controla qué aparece en el menú de la izquierda para este rol, independiente de los permisos de
               arriba, que controlan qué puede hacer con los datos.
             </p>
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">

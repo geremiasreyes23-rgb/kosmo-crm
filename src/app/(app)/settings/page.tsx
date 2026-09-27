@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 
 const ROLE_DESCRIPTIONS: Record<string, string> = {
   "Super Admin": "Acceso total al sistema, incluida la gestión de usuarios y roles",
-  Admin: "Administración del CRM — usuarios, configuración, todos los módulos",
+  Admin: "Administración del CRM: usuarios, configuración, todos los módulos",
   Manager: "Visualización y administración de su equipo",
   Agent: "Acceso a sus propios leads, clientes, ventas y actividades",
   Viewer: "Solo lectura",
@@ -176,7 +176,7 @@ export default async function SettingsPage() {
 
   return (
     <div>
-      <PageHeader title="Configuración" description="Administración del sistema — todo configurable, nada hardcodeado" />
+      <PageHeader title="Configuración" />
       <Card>
         <CardContent className="pt-5">
           <Tabs
@@ -265,7 +265,7 @@ export default async function SettingsPage() {
                   <UsersPanel initialUsers={userRows} roles={roleOptions} currentUserId={currentUser.id} />
                 ) : (
                   <p className="text-sm text-[var(--ink-muted)]">
-                    No tienes permiso para gestionar usuarios — solo Admin y Super Admin.
+                    No tienes permiso para gestionar usuarios. Solo Admin y Super Admin pueden hacerlo.
                   </p>
                 ),
               },

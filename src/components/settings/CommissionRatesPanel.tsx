@@ -99,7 +99,7 @@ export function CommissionRatesPanel({
     <div>
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-xs text-[var(--ink-muted)]">
-          La comisión de cada póliza se calcula con la tarifa vigente al momento de la venta — sin tarifa por
+          La comisión de cada póliza se calcula con la tarifa vigente al momento de la venta. Sin tarifa por
           agente, se usa la tarifa base de la línea.
         </p>
         {canManage && (
@@ -163,7 +163,7 @@ export function CommissionRatesPanel({
             <Tr>
               <Td colSpan={canManage ? 8 : 7}>
                 <p className="py-6 text-center text-sm text-[var(--ink-muted)]">
-                  Todavía no hay tarifas configuradas — crea la primera con &quot;Nueva tarifa&quot;.
+                  Todavía no hay tarifas configuradas. Crea la primera con &quot;Nueva tarifa&quot;.
                 </p>
               </Td>
             </Tr>
@@ -195,7 +195,7 @@ export function CommissionRatesPanel({
             </Select>
           </FieldWrapper>
 
-          <FieldWrapper label="Agente (opcional — vacío = tarifa base de la línea)">
+          <FieldWrapper label="Agente (opcional, vacío = tarifa base de la línea)">
             <Select value={form.agentId} onChange={(e) => setForm({ ...form, agentId: e.target.value })}>
               <option value="">Tarifa base (todos los agentes)</option>
               {agents.map((a) => (

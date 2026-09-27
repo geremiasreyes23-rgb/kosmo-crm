@@ -113,7 +113,7 @@ function validateAttachments(
       return `El tipo de archivo ".${ext || "?"}" no está permitido (permitidos: ${settings.allowedExtensions.join(", ")}).`;
     }
     if (!a.dataUrl.startsWith("data:")) {
-      return `"${a.fileName}" no se pudo procesar — vuelve a adjuntarlo.`;
+      return `"${a.fileName}" no se pudo procesar. Vuelve a adjuntarlo.`;
     }
   }
   return null;
@@ -502,7 +502,7 @@ export async function adminInspectMailboxAction(
   }
   const trimmedReason = reason.trim();
   if (trimmedReason.length < 10) {
-    return { ok: false, error: "Escribe un motivo (mínimo 10 caracteres) — queda registrado en la auditoría." };
+    return { ok: false, error: "Escribe un motivo (mínimo 10 caracteres): queda registrado en la auditoría." };
   }
 
   const mailbox = await prisma.internalMailbox.findUnique({ where: { userId: targetUserId } });

@@ -223,7 +223,7 @@ export default function LoginPage() {
           </div>
 
           <p className="mt-5 text-center text-xs text-white/40">
-            Fase 2 — Autenticación real conectada a base de datos.
+            Autenticación real conectada a base de datos.
           </p>
         </div>
           </>

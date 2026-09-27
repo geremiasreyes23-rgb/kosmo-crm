@@ -31,7 +31,7 @@ export async function uploadDocumentAction(input: UploadDocumentInput): Promise<
   const fileName = input.fileName.trim();
   if (!fileName) return { ok: false, error: "El archivo no tiene nombre." };
   if (!input.dataUrl.startsWith("data:")) {
-    return { ok: false, error: "No se pudo procesar el archivo — vuelve a adjuntarlo." };
+    return { ok: false, error: "No se pudo procesar el archivo. Vuelve a adjuntarlo." };
   }
   if (input.sizeBytes > MAX_DOCUMENT_SIZE_MB * 1024 * 1024) {
     return { ok: false, error: `"${fileName}" supera el límite de ${MAX_DOCUMENT_SIZE_MB}MB.` };

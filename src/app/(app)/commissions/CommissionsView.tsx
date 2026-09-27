@@ -95,7 +95,7 @@ export function CommissionsView({
                 <Tr>
                   <Td colSpan={8}>
                     <p className="py-6 text-center text-sm text-[var(--ink-muted)]">
-                      Sin comisiones todavía — se generan automáticamente cuando una póliza pasa a estado Activa.
+                      Sin comisiones todavía. Se generan automáticamente cuando una póliza pasa a estado Activa.
                     </p>
                   </Td>
                 </Tr>

@@ -351,7 +351,7 @@ export function ProfileModal({
             <Button size="sm" onClick={goToChat}>
               <MessageCircle className="h-4 w-4" /> Chat
             </Button>
-            <Button size="sm" variant="secondary" disabled title="Videollamada — próximamente">
+            <Button size="sm" variant="secondary" disabled title="Videollamada (próximamente)">
               <Video className="h-4 w-4" /> Videollamada
             </Button>
             {!editing ? (

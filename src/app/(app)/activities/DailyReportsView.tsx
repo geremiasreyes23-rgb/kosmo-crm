@@ -481,7 +481,7 @@ export function DailyReportsView({
               <div>
                 <p className="text-sm font-semibold text-[var(--ink-primary)]">Sin reportes en este rango</p>
                 <p className="mt-1 text-xs text-[var(--ink-muted)]">
-                  Prueba con otro período — tus reportes anteriores siguen guardados.
+                  Prueba con otro período. Tus reportes anteriores siguen guardados.
                 </p>
               </div>
             </div>

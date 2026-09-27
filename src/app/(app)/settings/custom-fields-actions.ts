@@ -132,7 +132,7 @@ export async function deleteCustomFieldAction(id: string): Promise<CustomFieldAc
   if (valueCount > 0) {
     return {
       ok: false,
-      error: "Este campo ya tiene datos guardados en registros existentes — desactívalo en vez de eliminarlo.",
+      error: "Este campo ya tiene datos guardados en registros existentes. Desactívalo en vez de eliminarlo.",
     };
   }
 

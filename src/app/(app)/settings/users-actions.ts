@@ -137,7 +137,7 @@ export async function updateUserAction(
     if (before?.role.name === "Super Admin" && targetRole.name !== "Super Admin") {
       const remaining = await activeSuperAdminCount(userId);
       if (remaining === 0) {
-        return { ok: false, error: "Debe quedar al menos un Super Admin activo — no puedes cambiarle el rol al último." };
+        return { ok: false, error: "Debe quedar al menos un Super Admin activo. No puedes cambiarle el rol al último." };
       }
     }
   }

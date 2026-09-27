@@ -135,7 +135,7 @@ export function DocumentsView({
     <div>
       <PageHeader
         title="Documentos"
-        description="Todos los documentos del CRM en un solo lugar — leads, clientes, ventas y pólizas"
+        description="Todos los documentos del CRM en un solo lugar: leads, clientes, ventas y pólizas"
         actions={
           canUpload ? (
             <Button size="sm" onClick={openDrawer}>

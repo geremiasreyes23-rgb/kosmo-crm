@@ -22,7 +22,7 @@ export default function LogoTestPreviewPage() {
 
       <div className="relative z-10 flex flex-col items-center gap-10">
         <p className="text-xs font-medium uppercase tracking-wider text-white/40">
-          Vista de prueba — solo comparación, tamaño reducido
+          Vista de prueba: solo comparación, tamaño reducido
         </p>
 
         <div className="flex items-center gap-3.5">

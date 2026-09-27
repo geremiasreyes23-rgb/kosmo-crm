@@ -137,7 +137,7 @@ export function PipelinesPanel({
           <div className="flex items-center justify-between border-b border-[var(--border-hairline)] px-4 py-2.5">
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold">{pipeline.name}</p>
-              {pipeline.isDefault && <Badge status="info">En uso — Kanban en vivo</Badge>}
+              {pipeline.isDefault && <Badge status="info">En uso: Kanban en vivo</Badge>}
             </div>
           </div>
 
@@ -272,7 +272,7 @@ export function PipelinesPanel({
         open={createPipelineOpen}
         onClose={() => setCreatePipelineOpen(false)}
         title={`Nuevo pipeline de ${ENTITY_LABEL[entityTab]}`}
-        description="Se crea vacío — agregale etapas después de crearlo. No reemplaza al pipeline en uso hoy en el Kanban."
+        description="Se crea vacío. Agregale etapas después de crearlo. No reemplaza al pipeline en uso hoy en el Kanban."
       >
         <div className="space-y-3">
           <FieldWrapper label="Nombre">

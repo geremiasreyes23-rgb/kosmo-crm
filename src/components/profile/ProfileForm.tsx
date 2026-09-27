@@ -162,7 +162,7 @@ export function ProfileForm({ user }: { user: ProfileData }) {
               <p className="mt-0.5 truncate text-sm text-[var(--ink-muted)]">{user.email}</p>
             </div>
           </div>
-          <p className="mt-3 text-xs text-[var(--ink-muted)]">JPG, PNG o WEBP — máx. 1.5 MB</p>
+          <p className="mt-3 text-xs text-[var(--ink-muted)]">JPG, PNG o WEBP, máx. 1.5 MB</p>
           {avatarError && <p className="mt-1 text-xs text-[var(--status-critical)]">{avatarError}</p>}
         </div>
       </div>
@@ -203,7 +203,7 @@ export function ProfileForm({ user }: { user: ProfileData }) {
           <InfoRow icon={<ShieldCheck className="h-4 w-4" />} label="Rol">
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium text-[var(--ink-primary)]">{user.roleName}</p>
-              <span className="text-xs text-[var(--ink-muted)]">— lo administra tu Admin</span>
+              <span className="text-xs text-[var(--ink-muted)]">(lo administra tu Admin)</span>
             </div>
           </InfoRow>
         </div>

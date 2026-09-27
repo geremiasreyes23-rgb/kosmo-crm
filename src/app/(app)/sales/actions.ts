@@ -179,7 +179,7 @@ export async function moveSaleStageAction(saleId: string, newStageId: string): P
   });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return { ok: false, error: "Esta venta ya tiene una póliza generada — actualiza la página e inténtalo de nuevo." };
+      return { ok: false, error: "Esta venta ya tiene una póliza generada. Actualiza la página e inténtalo de nuevo." };
     }
     throw err;
   }

@@ -23,10 +23,10 @@ export async function updateAvatarAction(
 
   const match = /^data:(image\/(?:jpeg|png|webp));base64,/.exec(dataUrl);
   if (!match || !ALLOWED_AVATAR_TYPES.includes(match[1])) {
-    return { ok: false, error: "Formato de imagen no soportado — usa JPG, PNG o WEBP." };
+    return { ok: false, error: "Formato de imagen no soportado. Usa JPG, PNG o WEBP." };
   }
   if (dataUrl.length > MAX_AVATAR_DATA_URL_LENGTH) {
-    return { ok: false, error: "La imagen es muy pesada — usa una de menos de 1.5 MB." };
+    return { ok: false, error: "La imagen es muy pesada. Usa una de menos de 1.5 MB." };
   }
 
   await prisma.user.update({ where: { id: user.id }, data: { avatarUrl: dataUrl } });
@@ -50,10 +50,10 @@ export async function updateCoverPhotoAction(
 
   const match = /^data:(image\/(?:jpeg|png|webp));base64,/.exec(dataUrl);
   if (!match || !ALLOWED_AVATAR_TYPES.includes(match[1])) {
-    return { ok: false, error: "Formato de imagen no soportado — usa JPG, PNG o WEBP." };
+    return { ok: false, error: "Formato de imagen no soportado. Usa JPG, PNG o WEBP." };
   }
   if (dataUrl.length > MAX_COVER_DATA_URL_LENGTH) {
-    return { ok: false, error: "La imagen es muy pesada — usa una de menos de 3 MB." };
+    return { ok: false, error: "La imagen es muy pesada. Usa una de menos de 3 MB." };
   }
 
   await prisma.user.update({ where: { id: user.id }, data: { coverPhotoUrl: dataUrl } });

@@ -113,7 +113,7 @@ export function MailSettingsPanel({
           <h3 className="text-sm font-semibold">Configuración del módulo</h3>
         </div>
         <p className="mb-4 text-xs text-[var(--ink-muted)]">
-          Dominio interno vigente: <span className="font-mono font-medium text-[var(--ink-primary)]">@{overview.domain}</span> — se
+          Dominio interno vigente: <span className="font-mono font-medium text-[var(--ink-primary)]">@{overview.domain}</span>, se
           cambia con la variable de entorno <span className="font-mono">INTERNAL_EMAIL_DOMAIN</span>, no desde aquí (las direcciones
           ya emitidas se conservan tal cual se crearon aunque el dominio cambie).
         </p>
@@ -157,7 +157,7 @@ export function MailSettingsPanel({
           <h3 className="text-sm font-semibold">Acceso excepcional a un buzón</h3>
         </div>
         <p className="mb-3 text-xs text-[var(--ink-muted)]">
-          Nadie —ni un Admin— ve el correo de otro usuario por defecto. Esto solo funciona con un motivo explícito, y queda
+          Nadie (ni un Admin) ve el correo de otro usuario por defecto. Esto solo funciona con un motivo explícito, y queda
           registrado en la auditoría como acceso administrativo excepcional.
         </p>
         <div className="grid gap-3 md:grid-cols-[1fr_2fr_auto]">
@@ -189,7 +189,7 @@ export function MailSettingsPanel({
               <ul className="space-y-1">
                 {inspectResult.messages.map((m, i) => (
                   <li key={i} className="text-xs text-[var(--ink-secondary)]">
-                    <span className="font-medium">{m.subject}</span> — de {m.from} ({m.to})
+                    <span className="font-medium">{m.subject}</span>: de {m.from} ({m.to})
                   </li>
                 ))}
               </ul>

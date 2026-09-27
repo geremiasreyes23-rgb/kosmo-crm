@@ -114,7 +114,7 @@ export function ReportsView() {
                       variant="ghost"
                       size="sm"
                       aria-label="Exportar para Excel"
-                      title="Genera un .csv — se abre directamente en Excel"
+                      title="Genera un .csv que se abre directamente en Excel"
                       disabled={loadingKey === r.key}
                       onClick={() => handleExport(r.key)}
                     >

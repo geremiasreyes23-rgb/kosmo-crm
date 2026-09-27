@@ -49,7 +49,7 @@ export const THEME_OPTIONS: ThemeOption[] = [
   {
     value: "AURORA_VIOLET",
     label: "Aurora Violet",
-    tagline: "Elegante, moderno y espacial — el tema principal de KOSMO.",
+    tagline: "Elegante, moderno y espacial: el tema principal de KOSMO.",
     primary: "#8b5cf6",
     primaryHover: "#7c3aed",
     secondary: "#c4b5fd",

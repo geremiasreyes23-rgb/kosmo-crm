@@ -35,7 +35,7 @@ async function requireRolesManager() {
  */
 function assertEditableRole(roleName: string, currentRoleName: string): string | null {
   if (roleName === "Super Admin") {
-    return "Super Admin tiene acceso total fijo por diseño — no depende de permisos guardados, así que no se puede editar.";
+    return "Super Admin tiene acceso total fijo por diseño. No depende de permisos guardados, así que no se puede editar.";
   }
   if (roleName === "Admin" && currentRoleName !== "Super Admin") {
     return "Solo un Super Admin puede modificar los permisos del rol Admin.";

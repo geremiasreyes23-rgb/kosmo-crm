@@ -158,7 +158,7 @@ export function CustomFieldsPanel({
     <div>
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-xs text-[var(--ink-muted)]">
-          {initialFields.length} campo{initialFields.length === 1 ? "" : "s"} — se usan en los formularios de
+          {initialFields.length} campo{initialFields.length === 1 ? "" : "s"}. Se usan en los formularios de
           Lead, Cliente, Póliza y Venta según el producto que se esté vendiendo.
         </p>
         {canManage && (
@@ -236,7 +236,7 @@ export function CustomFieldsPanel({
             <Tr>
               <Td colSpan={canManage ? 6 : 5}>
                 <p className="py-6 text-center text-sm text-[var(--ink-muted)]">
-                  Todavía no hay campos personalizados — crea el primero con &quot;Nuevo campo&quot;.
+                  Todavía no hay campos personalizados. Crea el primero con &quot;Nuevo campo&quot;.
                 </p>
               </Td>
             </Tr>
@@ -248,7 +248,7 @@ export function CustomFieldsPanel({
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         title="Nuevo campo personalizado"
-        description="Queda disponible de inmediato en el formulario correspondiente — sin tocar código."
+        description="Queda disponible de inmediato en el formulario correspondiente, sin tocar código."
       >
         <div className="space-y-4">
           {formError && (

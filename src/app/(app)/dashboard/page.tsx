@@ -169,7 +169,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Cake className="h-4 w-4 text-[var(--brand-500)]" /> Alertas — Turning 65
+              <Cake className="h-4 w-4 text-[var(--brand-500)]" /> Alertas: Turning 65
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">

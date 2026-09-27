@@ -78,7 +78,7 @@ export function ComposeModal({
     for (const file of Array.from(files)) {
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
       if (!settings.allowedExtensions.includes(ext)) {
-        setError(`".${ext}" no está permitido — solo: ${settings.allowedExtensions.join(", ")}.`);
+        setError(`".${ext}" no está permitido. Formatos permitidos: ${settings.allowedExtensions.join(", ")}.`);
         continue;
       }
       if (file.size > maxBytes) {
@@ -195,7 +195,7 @@ export function ComposeModal({
             <input type="file" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
           </label>
           <p className="text-[11px] text-[var(--ink-muted)]">
-            Máximo {settings.maxAttachmentSizeMb}MB por archivo — tipos permitidos: {settings.allowedExtensions.join(", ")}.
+            Máximo {settings.maxAttachmentSizeMb}MB por archivo. Tipos permitidos: {settings.allowedExtensions.join(", ")}.
           </p>
         </div>
 

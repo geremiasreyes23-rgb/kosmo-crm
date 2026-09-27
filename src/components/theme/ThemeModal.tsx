@@ -31,7 +31,7 @@ export function ThemeModal({ open, onClose }: { open: boolean; onClose: () => vo
             <div>
               <h2 className="text-sm font-semibold text-[var(--ink-primary)]">Tema del sistema</h2>
               <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
-                Elige la identidad visual del CRM. Solo cambia colores — nada más se mueve.
+                Elige la identidad visual del CRM. Solo cambia colores, nada más se mueve.
               </p>
             </div>
           </div>

@@ -31,7 +31,7 @@ export default async function ChangePasswordPage() {
             <div className="mb-5">
               <h1 className="text-lg font-semibold text-white">Crea tu contraseña</h1>
               <p className="text-sm text-white/60">
-                Es tu primer ingreso — elige una contraseña nueva para tu cuenta.
+                Es tu primer ingreso: elige una contraseña nueva para tu cuenta.
               </p>
             </div>
             <ChangePasswordForm email={user.email} />

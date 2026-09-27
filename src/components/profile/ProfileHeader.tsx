@@ -116,7 +116,7 @@ export function ProfileHeader({
               size="sm"
               variant="secondary"
               disabled
-              title="Videollamada — próximamente"
+              title="Videollamada (próximamente)"
               className="w-full sm:w-auto"
             >
               <Video className="h-4 w-4" /> Videollamada

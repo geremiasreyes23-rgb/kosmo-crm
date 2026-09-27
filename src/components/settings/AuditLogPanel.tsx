@@ -158,7 +158,7 @@ export function AuditLogPanel({ entries }: { entries: AuditLogRowVM[] }) {
 
       {entries.length >= 300 && (
         <p className="mt-3 text-xs text-[var(--ink-muted)]">
-          Mostrando los últimos 300 eventos — el historial completo queda guardado en la base de datos.
+          Mostrando los últimos 300 eventos. El historial completo queda guardado en la base de datos.
         </p>
       )}
     </div>
