@@ -8,26 +8,30 @@ import type { ChatMessage } from "@/types";
  * (conectada vía Server-Sent Events, ver app/api/messenger/stream/route.ts)
  * lo recibe al instante sin tener que hacer polling.
  *
- * Funciona porque `next dev`/`next start` corre como UN solo proceso de
- * Node en esta instalación (no serverless/multi-instancia) — si en el
- * futuro la app se despliega en varias instancias detrás de un balanceador,
- * este bus dejaría de alcanzar a los clientes conectados a OTRA instancia y
- * habría que reemplazarlo por algo compartido (Postgres LISTEN/NOTIFY, Redis
- * pub/sub, etc.). Mientras sea una sola instancia, esto es tiempo real de
- * verdad, sin dependencias nuevas ni costo adicional.
+ * Funciona mientras la app corra como UN solo proceso de Node (no
+ * serverless/multi-instancia) — si en el futuro se despliega en varias
+ * instancias detrás de un balanceador, este bus dejaría de alcanzar a los
+ * clientes conectados a OTRA instancia y habría que reemplazarlo por algo
+ * compartido (Postgres LISTEN/NOTIFY, Redis pub/sub, etc.).
  *
  * Patrón singleton en `globalThis` — igual que el PrismaClient de db.ts —
- * para no crear un EventEmitter nuevo (y perder a los suscriptores) en cada
- * hot-reload de `next dev`.
+ * y SIEMPRE, en todo entorno, no solo en desarrollo. Next.js compila las
+ * Server Actions y los Route Handlers en bundles de servidor separados, y
+ * cada uno evalúa su propia copia de este módulo — sin persistir en
+ * `globalThis` en TODOS los entornos, la Server Action que publica un
+ * mensaje y el Route Handler SSE que lo debería reenviar terminan con dos
+ * EventEmitter distintos aunque compartan el mismo proceso de Node, y el
+ * evento se publica sin que nadie esté escuchando (bug real encontrado y
+ * confirmado en producción el 2026-09-27 vía logs de diagnóstico: todo
+ * publish mostraba "listeners=0"). `globalThis` sí es compartido de verdad
+ * entre esos bundles dentro de un mismo proceso — por eso el fix es
+ * dejar de saltear esta línea en producción.
  */
 const globalForMessenger = globalThis as unknown as { messengerEvents?: EventEmitter };
 
 export const messengerEvents = globalForMessenger.messengerEvents ?? new EventEmitter();
 messengerEvents.setMaxListeners(0); // sin límite — un listener por pestaña conectada
-
-if (process.env.NODE_ENV !== "production") {
-  globalForMessenger.messengerEvents = messengerEvents;
-}
+globalForMessenger.messengerEvents = messengerEvents;
 
 export interface MessengerMessageEvent {
   type: "message";
@@ -95,11 +99,6 @@ const CHANNEL = "messenger";
 const PRESENCE_CHANNEL = "messenger-presence";
 
 export function publishMessengerEvent(event: MessengerEvent) {
-  // LOG TEMPORAL DE DIAGNÓSTICO — bug "los mensajes no llegan en tiempo
-  // real". Se borra en cuanto quede resuelto.
-  console.log(
-    `[DIAG messengerEvents] publish type=${event.type} conv=${event.conversationId} listeners=${messengerEvents.listenerCount(CHANNEL)}`
-  );
   messengerEvents.emit(CHANNEL, event);
 }
 

@@ -16,9 +16,9 @@ const globalForNotifications = globalThis as unknown as { notificationEvents?: E
 export const notificationEvents = globalForNotifications.notificationEvents ?? new EventEmitter();
 notificationEvents.setMaxListeners(0);
 
-if (process.env.NODE_ENV !== "production") {
-  globalForNotifications.notificationEvents = notificationEvents;
-}
+// Ver messengerEvents.ts — mismo fix, misma causa raíz (persistir SIEMPRE
+// en globalThis, no solo en desarrollo).
+globalForNotifications.notificationEvents = notificationEvents;
 
 export interface NotificationCreatedEvent {
   type: "notification";

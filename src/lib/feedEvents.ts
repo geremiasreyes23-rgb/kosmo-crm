@@ -23,9 +23,9 @@ const globalForFeed = globalThis as unknown as { feedEvents?: EventEmitter };
 export const feedEvents = globalForFeed.feedEvents ?? new EventEmitter();
 feedEvents.setMaxListeners(0);
 
-if (process.env.NODE_ENV !== "production") {
-  globalForFeed.feedEvents = feedEvents;
-}
+// Ver messengerEvents.ts — mismo fix, misma causa raíz (persistir SIEMPRE
+// en globalThis, no solo en desarrollo).
+globalForFeed.feedEvents = feedEvents;
 
 export interface FeedChangedEvent {
   type: "feed-changed";
