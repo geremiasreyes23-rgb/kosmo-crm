@@ -163,7 +163,22 @@ export function HolographicSphere({
       const h = container.clientHeight || 160;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setSize(w, h, false);
+      // OJO: el tercer argumento de setSize por defecto (true) hace que
+      // Three.js fije tambien el tamano VISUAL en CSS del canvas ademas de
+      // su resolucion interna. Antes se pasaba `false` para saltarse eso, y
+      // como nada mas en este componente define el ancho/alto CSS del
+      // canvas, el navegador terminaba mostrandolo al tamano de sus
+      // atributos width/height internos — que Three.js ya multiplico por el
+      // devicePixelRatio de la pantalla. En un monitor con DPR=1 eso
+      // coincidia por casualidad con `size`, pero en cualquier pantalla con
+      // DPR distinto de 1 (la gran mayoria de laptops, celulares, tablets)
+      // la esfera se dibujaba mas grande que la caja que le reservo el
+      // layout y se salia de su lugar (reportado: se superponia con el
+      // texto de bienvenida, y el icono chico del sidebar se veia
+      // desparejo/puntiagudo). Sin el `false`, el tamano visual siempre
+      // queda exactamente en `size` px sin importar el DPR — la nitidez en
+      // pantallas retina se sigue logrando via setPixelRatio() arriba.
+      renderer.setSize(w, h);
     }
     resizeToContainer();
 
