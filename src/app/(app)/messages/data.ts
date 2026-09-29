@@ -43,6 +43,62 @@ function toChatUser(row: {
  * src/data/messenger.ts (Fase 1): conversaciones, mensajes y usuarios ahora
  * son filas reales compartidas entre todos los que entran a la plataforma.
  */
+/**
+ * Versión liviana de arriba — se llama desde el layout de (app) en CADA
+ * navegación (para que el badge de no-leídos del Sidebar esté siempre al
+ * día), así que NO puede traer mensajes completos ni imágenes: eso fue
+ * justo lo que generó el consumo de red desproporcionado en Neon (ver
+ * incidente de egress de sep/2026) — `getMessengerViewData` de arriba trae
+ * TODO el historial con imágenes en base64, y se estaba llamando en cada
+ * carga de cualquier página del CRM, no solo de /messages.
+ *
+ * Esta versión solo cuenta mensajes no leídos por conversación (un COUNT
+ * chico por conversación, nunca el contenido) y devuelve el par
+ * id/otherUserId de cada conversación — lo mínimo que necesita el Sidebar.
+ * El historial completo (mensajes, imágenes, roster con avatares) se pide
+ * una sola vez desde el cliente, al montar MessengerProvider — ver
+ * getMessengerFullDataAction en actions.ts y el useEffect en
+ * MessengerProvider.tsx — no en cada navegación.
+ */
+export interface MessengerBadgeData {
+  conversations: { id: string; userId: string }[];
+  unreadByConv: Record<string, number>;
+}
+
+export async function getMessengerBadgeData(sessionUser: SessionUser): Promise<MessengerBadgeData> {
+  const myConversations = await prisma.conversation.findMany({
+    where: { OR: [{ userAId: sessionUser.id }, { userBId: sessionUser.id }] },
+    select: {
+      id: true,
+      userAId: true,
+      userBId: true,
+      reads: { where: { userId: sessionUser.id }, select: { lastReadAt: true } },
+    },
+  });
+
+  const conversations = myConversations.map((c) => ({
+    id: c.id,
+    userId: c.userAId === sessionUser.id ? c.userBId : c.userAId,
+  }));
+
+  const unreadByConv: Record<string, number> = {};
+  await Promise.all(
+    myConversations.map(async (c) => {
+      const myLastReadAt = c.reads[0]?.lastReadAt ?? new Date(0);
+      unreadByConv[c.id] = await prisma.message.count({
+        where: {
+          conversationId: c.id,
+          senderId: { not: sessionUser.id },
+          sentAt: { gt: myLastReadAt },
+          deletedAt: null,
+        },
+      });
+    })
+  );
+
+  return { conversations, unreadByConv };
+}
+
 export async function getMessengerViewData(sessionUser: SessionUser): Promise<MessengerInitialData> {
   const [allUsers, myConversations] = await Promise.all([
     prisma.user.findMany({

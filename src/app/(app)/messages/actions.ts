@@ -7,6 +7,7 @@ import { publishNotificationEvent } from "@/lib/notificationEvents";
 import { groupReactions } from "@/lib/reactions";
 import { isUserOnline } from "@/lib/presence";
 import type { ChatMessage, MessageReactionGroup, NotificationVM, UserQuickProfileVM } from "@/types";
+import { getMessengerViewData, type MessengerInitialData } from "./data";
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
@@ -433,4 +434,18 @@ export async function getUserQuickProfileAction(userId: string): Promise<UserQui
   };
 
   return { ok: true, profile };
+}
+
+/**
+ * Historial completo del chat (roster con avatares + todos los mensajes con
+ * sus imágenes) — se pide UNA sola vez desde el cliente al montar
+ * MessengerProvider, no en cada navegación (ver comentario en
+ * getMessengerBadgeData, data.ts). Los datos livianos para el badge del
+ * Sidebar siguen viniendo del layout en cada carga; esto es deliberadamente
+ * lo único "pesado" del chat, y ahora se paga una sola vez por sesión de
+ * navegador en vez de una vez por click en el menú.
+ */
+export async function getMessengerFullDataAction(): Promise<MessengerInitialData> {
+  const user = await requireUser();
+  return getMessengerViewData(user);
 }

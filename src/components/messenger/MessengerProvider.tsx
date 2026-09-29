@@ -10,6 +10,7 @@ import {
   deleteMessageAction,
   togglePinMessageAction,
   toggleReactionAction,
+  getMessengerFullDataAction,
 } from "@/app/(app)/messages/actions";
 import type { ChatConversation, ChatMessage, ChatUser, MessageReactionGroup } from "@/types";
 import type { ComposerSendPayload } from "./ChatComposer";
@@ -56,6 +57,15 @@ export function MessengerProvider({
   const [conversations, setConversations] = useState<ChatConversation[]>(initialData.conversations);
   const [messagesByConv, setMessagesByConv] = useState<Record<string, ChatMessage[]>>(initialData.messagesByConv);
   const [unreadByConv, setUnreadByConv] = useState<Record<string, number>>(initialData.unreadByConv);
+  // Roster completo (con avatares) y el historial de mensajes NO vienen
+  // más en initialData (ver layout.tsx / getMessengerBadgeData) — arrancan
+  // vacíos y se piden una sola vez acá abajo (useEffect "cargar historial
+  // completo"), en vez de en cada navegación por el layout. Antes de que
+  // resuelva, la UI se comporta igual que con Mensajería recién montada:
+  // sin usuarios para iniciar chat todavía, conversaciones sin mensajes
+  // (getChatUser ya tiene un fallback para id desconocido, y el merge de
+  // SSE de abajo ya tolera messagesByConv[id] inexistente).
+  const [users, setUsers] = useState<ChatUser[]>(initialData.users);
   // Pedido explícito: nunca seleccionar automáticamente el primer chat
   // al entrar a Mensajería (antes: initialData.conversations[0]?.id ??
   // null). El estado inicial es siempre null, sin importar cuántas
@@ -84,9 +94,9 @@ export function MessengerProvider({
   const usersById = useMemo(() => {
     const map = new Map<string, ChatUser>();
     map.set(initialData.currentUser.id, initialData.currentUser);
-    for (const u of initialData.users) map.set(u.id, u);
+    for (const u of users) map.set(u.id, u);
     return map;
-  }, [initialData.currentUser, initialData.users]);
+  }, [initialData.currentUser, users]);
 
   // Presencia en línea — arranca con el snapshot que trajo el server
   // (ver getMessengerViewData/presence.ts) y se actualiza en vivo con los
@@ -96,6 +106,49 @@ export function MessengerProvider({
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(
     () => new Set(initialData.users.filter((u) => u.status === "ONLINE").map((u) => u.id))
   );
+
+  // Historial completo — se pide UNA vez por sesión de navegador al montar
+  // el provider, nunca en cada navegación (ver el comentario largo arriba y
+  // en messages/data.ts/actions.ts: esto fue la causa del consumo de red
+  // desproporcionado en Neon de sep/2026). El merge es defensivo: si algún
+  // mensaje llegó por SSE en la ventana breve antes de que esto resuelva,
+  // no se pierde — se combina en vez de pisarse.
+  useEffect(() => {
+    let cancelled = false;
+    getMessengerFullDataAction().then((full) => {
+      if (cancelled) return;
+      setUsers(full.users);
+      setOnlineUserIds(new Set(full.users.filter((u) => u.status === "ONLINE").map((u) => u.id)));
+      setConversations((prev) => {
+        const ids = new Set(full.conversations.map((c) => c.id));
+        const extra = prev.filter((c) => !ids.has(c.id));
+        return extra.length ? [...full.conversations, ...extra] : full.conversations;
+      });
+      setMessagesByConv((prev) => {
+        const merged: Record<string, ChatMessage[]> = { ...full.messagesByConv };
+        for (const [convId, msgs] of Object.entries(prev)) {
+          if (!merged[convId]) {
+            merged[convId] = msgs;
+            continue;
+          }
+          const existingIds = new Set(merged[convId].map((m) => m.id));
+          const extra = msgs.filter((m) => !existingIds.has(m.id));
+          if (extra.length) {
+            merged[convId] = [...merged[convId], ...extra].sort((a, b) => a.sentAt.localeCompare(b.sentAt));
+          }
+        }
+        return merged;
+      });
+    }).catch(() => {
+      // Si falla, Mensajería queda con lo mínimo del badge (conversaciones
+      // sin mensajes) — no rompe el resto de la app; se puede reintentar
+      // navegando a /messages y refrescando.
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function getChatUser(id: string): ChatUser {
     const base = usersById.get(id) ?? { id, name: "Usuario", role: "", avatarColor: FALLBACK_USER_COLOR, status: "OFFLINE" as const };
@@ -446,7 +499,7 @@ export function MessengerProvider({
 
   const value: MessengerContextValue = {
     currentUser: initialData.currentUser,
-    users: initialData.users,
+    users,
     conversations,
     messagesByConv,
     unreadByConv,

@@ -3,7 +3,9 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { NAV_MODULE_KEYS } from "@/lib/navModules";
 import { getProfileViewData } from "./profile/data";
-import { getMessengerViewData } from "./messages/data";
+import { getMessengerBadgeData } from "./messages/data";
+import type { MessengerInitialData } from "./messages/data";
+import { avatarColorFromId } from "@/lib/utils";
 import { getNotificationsForUser } from "./notifications/data";
 import type { TimeEntryPayload } from "./clock-actions";
 
@@ -53,11 +55,33 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
   // el Header, que es quien realmente lo usa.
   const profileData = await getProfileViewData(user);
 
-  // Chat interno — usuarios, conversaciones, mensajes y no-leídos reales
-  // (reemplaza el shell de datos ficticios de Fase 1). Se resuelve acá
-  // porque el badge de no-leídos vive en el Sidebar, visible en cualquier
-  // página, no solo en /messages.
-  const messengerData = await getMessengerViewData(user);
+  // Chat interno — SOLO lo que necesita el badge de no-leídos del Sidebar
+  // (visible en cualquier página, no solo en /messages): conteos y el par
+  // id/otherUserId de cada conversación. Hasta sep/2026 esto traía el
+  // historial COMPLETO de mensajes con imágenes en base64 en cada
+  // navegación de toda la app — ver getMessengerBadgeData en messages/data.ts
+  // para el detalle del incidente de egress que causó. El historial
+  // completo (con imágenes y el roster con avatares) se pide una sola vez
+  // desde el cliente al montar MessengerProvider (getMessengerFullDataAction).
+  const messengerBadgeData = await getMessengerBadgeData(user);
+
+  // currentUser liviano para MessengerProvider — se arma directo de `user`
+  // (ya viene de requireUser(), sin consulta adicional) para no tener que
+  // traer el roster completo solo para saber quién soy yo mismo.
+  const messengerData: MessengerInitialData = {
+    currentUser: {
+      id: user.id,
+      name: `${user.firstName} ${user.lastName}`,
+      role: user.roleName,
+      avatarColor: avatarColorFromId(user.id),
+      avatarUrl: user.avatarUrl ?? undefined,
+      status: "ONLINE",
+    },
+    users: [],
+    conversations: messengerBadgeData.conversations,
+    messagesByConv: {},
+    unreadByConv: messengerBadgeData.unreadByConv,
+  };
 
   // Campanita de notificaciones — mismo motivo que messengerData: se
   // resuelve acá porque el contador de no-leídas vive en el Header, visible
