@@ -4,8 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge, statusToBadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
-import { requireUser, hasPermission } from "@/lib/auth";
-import { getLeadForUser, getLeadPipelineStages } from "../data";
+import { requireUser, hasPermission, canViewAll } from "@/lib/auth";
+import { getLeadForUser, getLeadPipelineStages, getLeadEditData, getLeadFormOptions } from "../data";
+import { EditLeadButton } from "@/components/leads/EditLeadButton";
+import { LeadLineDetails } from "@/components/leads/LeadLineDetails";
+import { LeadRestrictedPanel } from "@/components/leads/LeadRestrictedPanel";
+import { COMMON_SENSITIVE, LINE_DEFS, ageFromDob, getLineDef, turning65, US_STATES } from "@/lib/leads/lineSchema";
 import { getActivitiesForUser } from "../../activities/data";
 import { getTasksForUser } from "../../tasks/data";
 import { getNotesForUser } from "@/lib/notes/data";
@@ -14,7 +18,7 @@ import { NotesTab } from "@/components/records/NotesTab";
 import { DocumentsTab } from "@/components/records/DocumentsTab";
 import { formatDate } from "@/lib/utils";
 import { ConvertToClientButton } from "@/components/leads/ConvertToClientButton";
-import { UserCheck } from "lucide-react";
+import { Cake, UserCheck } from "lucide-react";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -26,25 +30,51 @@ export default async function LeadDetailPage({
 }) {
   const { id } = await params;
   const user = await requireUser();
-  const [lead, stages, leadActivities, leadTasks, leadNotes, leadDocuments] = await Promise.all([
+  const [lead, stages, leadActivities, leadTasks, leadNotes, leadDocuments, editData, formOptions] = await Promise.all([
     getLeadForUser(id, user),
     getLeadPipelineStages(),
     getActivitiesForUser(user, { leadId: id }),
     getTasksForUser(user, { leadId: id }),
     getNotesForUser(user, { leadId: id }),
     getDocumentsForUser(user, { leadId: id }),
+    getLeadEditData(id, user),
+    getLeadFormOptions(),
   ]);
-  if (!lead) return notFound();
+  if (!lead || !editData) return notFound();
   const stage = stages.find((s) => s.id === lead.stageId);
   const canEditLead = hasPermission(user, "leads", "edit");
+  const canReveal = hasPermission(user, "sensitive_data", "view");
+  const lineDef = getLineDef(lead.lineCode);
+  const sensitiveByKey = Object.fromEntries(
+    editData.sensitive.map((s) => [s.fieldKey, { id: s.id, label: s.label, maskedPreview: s.maskedPreview }])
+  );
+  const commonRestricted = COMMON_SENSITIVE.filter((c) => sensitiveByKey[c.key]).map((c) => ({
+    ...sensitiveByKey[c.key],
+    label: c.label,
+  }));
+  const t65 = lead.lineCode === "MEDICARE" ? turning65(lead.dob) : null;
+  const age = ageFromDob(lead.dob);
+  const dobLabel = lead.dob
+    ? `${new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${lead.dob}T00:00:00Z`))}${age != null ? ` (${age} años)` : ""}`
+    : undefined;
 
   return (
     <div>
       <PageHeader
         title={`${lead.firstName} ${lead.lastName}`}
-        description={`Lead ${lead.id} · ${lead.source}`}
+        description={`${lead.leadCode ?? "Lead"} · ${lead.productLine ?? "Sin línea de negocio"} · ${lead.source}`}
         actions={
-          lead.convertedClientId ? (
+          <div className="flex items-center gap-2">
+          {canEditLead && (
+            <EditLeadButton
+              initial={editData}
+              formOptions={formOptions}
+              canAssignOthers={canViewAll(user)}
+              currentUserName={`${user.firstName} ${user.lastName}`}
+              currentAgentId={user.agentId}
+            />
+          )}
+          {lead.convertedClientId ? (
             <Link href={`/clients/${lead.convertedClientId}`}>
               <Button size="sm" variant="secondary">
                 <UserCheck className="h-4 w-4" /> Ver cliente
@@ -52,12 +82,19 @@ export default async function LeadDetailPage({
             </Link>
           ) : (
             <ConvertToClientButton leadId={lead.id} />
-          )
+          )}
+          </div>
         }
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
         <Badge status="info">{stage?.name}</Badge>
+        {lead.productLine && <Badge status="good">{lead.productLine}</Badge>}
+        {t65 && t65.status === "soon" && (
+          <Badge status="warning">
+            <Cake className="mr-1 h-3 w-3" /> {t65.message}
+          </Badge>
+        )}
         <Badge status="neutral">Vendedor: {lead.agentName}</Badge>
         <Badge status="neutral">Creado {formatDate(lead.createdAt)}</Badge>
         {lead.convertedAt && <Badge status="good">Convertido a cliente {formatDate(lead.convertedAt)}</Badge>}
@@ -73,18 +110,66 @@ export default async function LeadDetailPage({
                     id: "overview",
                     label: "Overview",
                     content: (
-                      <div className="space-y-5">
-                        <dl className="grid grid-cols-2 gap-4 text-sm">
-                          <Info label="Teléfono" value={lead.phone} />
-                          <Info label="Email" value={lead.email} />
-                          <Info label="Estado" value={lead.state} />
-                          <Info label="Origen" value={lead.source} />
-                          <Info label="Producto de interés" value={lead.productLine} />
-                          <Info label="Último contacto" value={lead.lastContactAt ? formatDate(lead.lastContactAt) : "—"} />
-                          <Info label="Próximo seguimiento" value={lead.nextFollowUpAt ? formatDate(lead.nextFollowUpAt) : "—"} />
-                        </dl>
+                      <div className="space-y-6">
+                        <section>
+                          <h3 className="mb-3 text-sm font-semibold">Información del cliente</h3>
+                          <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                            <Info label="ID de cliente" value={lead.leadCode} />
+                            <Info label="Fecha de creación" value={formatDate(lead.createdAt)} />
+                            <Info label="Nombre" value={lead.firstName} />
+                            <Info label="Apellido" value={lead.lastName} />
+                            <Info label="Fecha de nacimiento" value={dobLabel} />
+                            <Info label="Idioma preferido" value={lead.preferredLanguage} />
+                            <Info label="Teléfono" value={lead.phone} />
+                            <Info label="Correo electrónico" value={lead.email} />
+                            <Info label="Dirección" value={lead.address} />
+                            <Info label="Código postal" value={lead.zipCode} />
+                            <Info label="Condado" value={lead.county} />
+                            <Info label="Estado" value={US_STATES.find((s) => s.value === lead.state)?.label ?? lead.state} />
+                            <Info label="Origen del lead" value={lead.source} />
+                            <Info label="Vendedor" value={lead.agentName} />
+                            <Info label="AOR" value={lead.aorName} />
+                            <Info label="Último contacto" value={lead.lastContactAt ? formatDate(lead.lastContactAt) : "—"} />
+                          </dl>
+                          <div className="mt-4">
+                            <LeadRestrictedPanel
+                              title="Información restringida"
+                              items={commonRestricted}
+                              canReveal={canReveal}
+                              emptyText="Social Security y clave de seguridad sin capturar."
+                            />
+                          </div>
+                        </section>
+
+                        <section className="border-t border-[var(--border-hairline)] pt-5">
+                          <div className="mb-3 flex items-center justify-between gap-2">
+                            <h3 className="text-sm font-semibold">
+                              {lead.productLine ? `Información de ${lead.productLine}` : "Línea de negocio"}
+                            </h3>
+                            {lead.productLine && <Badge status="neutral">Línea: {lead.productLine}</Badge>}
+                          </div>
+                          {lineDef && editData.lineValues ? (
+                            <LeadLineDetails
+                              code={lineDef.code}
+                              values={editData.lineValues}
+                              dob={lead.dob}
+                              carriers={formOptions.carriersByLine[editData.lineId] ?? []}
+                              sensitiveByKey={sensitiveByKey}
+                              canReveal={canReveal}
+                            />
+                          ) : (
+                            <p className="text-sm text-[var(--ink-muted)]">
+                              {lead.productLine
+                                ? lineDef
+                                  ? `Aún no se capturaron los datos de ${LINE_DEFS[lineDef.code].label}. Usa "Editar lead" para completarlos.`
+                                  : "Esta línea no tiene campos propios."
+                                : 'Este lead todavía no tiene línea de negocio. Usa "Editar lead" para asignarla.'}
+                            </p>
+                          )}
+                        </section>
+
                         {lead.customFieldValues && Object.keys(lead.customFieldValues).length > 0 && (
-                          <div>
+                          <section className="border-t border-[var(--border-hairline)] pt-5">
                             <h4 className="mb-2 text-xs font-semibold uppercase text-[var(--ink-muted)]">
                               Campos personalizados
                             </h4>
@@ -93,7 +178,7 @@ export default async function LeadDetailPage({
                                 <Info key={key} label={key} value={value} />
                               ))}
                             </dl>
-                          </div>
+                          </section>
                         )}
                       </div>
                     ),

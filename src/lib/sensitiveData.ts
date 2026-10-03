@@ -2,7 +2,9 @@ import "server-only";
 
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
 import { maskSensitive } from "@/lib/utils";
+import { sensitiveKeyLabel } from "@/lib/leads/lineSchema";
 
 /**
  * Fase 4 — capa de cifrado a nivel de aplicación para SensitiveField
@@ -91,7 +93,7 @@ export const SENSITIVE_FIELD_LABELS: Record<string, string> = {
 };
 
 export function sensitiveFieldLabel(fieldKey: string): string {
-  return SENSITIVE_FIELD_LABELS[fieldKey] ?? fieldKey;
+  return SENSITIVE_FIELD_LABELS[fieldKey] ?? sensitiveKeyLabel(fieldKey);
 }
 
 export interface SensitiveFieldMaskedVM {
@@ -171,4 +173,72 @@ export async function revealSensitiveField(
   });
 
   return { fieldKey: row.fieldKey, label: sensitiveFieldLabel(row.fieldKey), value };
+}
+
+// ───────────── Datos restringidos de Leads (antes de la conversión) ─────────────
+
+/** Prefijo de las claves archivadas: un dato restringido que deja de
+ * pertenecer al lead (cambio de línea de negocio, dependiente eliminado) no
+ * se borra — SensitiveDataAccessLog lo referencia y la auditoría debe
+ * conservarse — sino que se archiva y deja de mostrarse. */
+export const ARCHIVED_SENSITIVE_PREFIX = "archived:";
+
+export interface LeadSensitiveMaskedVM {
+  id: string;
+  fieldKey: string;
+  label: string;
+  maskedPreview: string;
+}
+
+/** Datos restringidos activos de un lead, solo enmascarados. */
+export async function getLeadSensitiveMasked(leadId: string): Promise<LeadSensitiveMaskedVM[]> {
+  const rows = await prisma.sensitiveField.findMany({
+    where: { leadId, NOT: { fieldKey: { startsWith: ARCHIVED_SENSITIVE_PREFIX } } },
+    orderBy: { fieldKey: "asc" },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    fieldKey: r.fieldKey,
+    label: sensitiveFieldLabel(r.fieldKey),
+    maskedPreview: r.maskedPreview,
+  }));
+}
+
+/** Crea o reemplaza (cifrado) un dato restringido de un lead. */
+export async function upsertLeadSensitiveField(
+  tx: Prisma.TransactionClient,
+  leadId: string,
+  fieldKey: string,
+  plainValue: string
+): Promise<string> {
+  const encryptedValue = encryptSensitiveValue(plainValue);
+  const maskedPreview = maskedPreviewFor(plainValue);
+  const row = await tx.sensitiveField.upsert({
+    where: { leadId_fieldKey: { leadId, fieldKey } },
+    update: { encryptedValue, maskedPreview },
+    create: { leadId, fieldKey, encryptedValue, maskedPreview },
+  });
+  return row.id;
+}
+
+/** Archiva los datos restringidos del lead cuya clave ya no es válida. */
+export async function archiveLeadSensitiveFields(
+  tx: Prisma.TransactionClient,
+  leadId: string,
+  keepKeys: Set<string>
+): Promise<string[]> {
+  const rows = await tx.sensitiveField.findMany({
+    where: { leadId, NOT: { fieldKey: { startsWith: ARCHIVED_SENSITIVE_PREFIX } } },
+    select: { id: true, fieldKey: true },
+  });
+  const archived: string[] = [];
+  for (const r of rows) {
+    if (keepKeys.has(r.fieldKey)) continue;
+    await tx.sensitiveField.update({
+      where: { id: r.id },
+      data: { fieldKey: `${ARCHIVED_SENSITIVE_PREFIX}${Date.now()}:${r.fieldKey}` },
+    });
+    archived.push(r.fieldKey);
+  }
+  return archived;
 }

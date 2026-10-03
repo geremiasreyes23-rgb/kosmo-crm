@@ -13,6 +13,12 @@ export function formatClientCode(clientNumber: number): string {
   return `C-${String(clientNumber).padStart(6, "0")}`;
 }
 
+/** ID visible de lead ("ID de cliente" en el formulario), asignado por el
+ * sistema (Lead.leadNumber), ej. "L-000123". */
+export function formatLeadCode(leadNumber: number): string {
+  return `L-${String(leadNumber).padStart(6, "0")}`;
+}
+
 /** Formatea un valor monetario en USD. */
 export function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {

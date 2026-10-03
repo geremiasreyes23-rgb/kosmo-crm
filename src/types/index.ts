@@ -46,6 +46,16 @@ export interface Lead {
    * cliente en vez de la acción, y no se puede convertir dos veces. */
   convertedClientId?: string;
   convertedAt?: string;
+  /** ID visible del lead ("ID de cliente"), ej. "L-000123". */
+  leadCode?: string;
+  dob?: string;
+  address?: string;
+  zipCode?: string;
+  county?: string;
+  preferredLanguage?: string;
+  aorName?: string;
+  /** Código de la línea de negocio (MEDICARE / OBAMACARE / FAMILY_HERITAGE). */
+  lineCode?: string;
 }
 
 /** Vista previa segura de un campo sensible (SSN, cuenta bancaria...) — solo

@@ -153,7 +153,9 @@ export async function revealSensitiveFieldAction(
     where: { id: fieldId },
     include: { client: true },
   });
-  if (!field) {
+  // Los datos sensibles de un Lead (clientId null) se revelan desde
+  // revealLeadSensitiveFieldAction, con su propio control de alcance.
+  if (!field || !field.client) {
     return { ok: false, error: "El campo ya no existe." };
   }
   if (!canViewAll(user) && field.client.agentId !== user.agentId) {

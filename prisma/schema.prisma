@@ -347,6 +347,9 @@ model PipelineHistory {
 
 model Lead {
   id              String        @id @default(cuid())
+  // ID visible del cliente/lead — autoincremental de Postgres, nunca se
+  // captura a mano. Se muestra como "L-000123" (formatLeadCode).
+  leadNumber      Int           @unique @default(autoincrement())
   firstName       String
   lastName        String
   dob             DateTime?
@@ -388,6 +391,16 @@ model Lead {
   notes        Note[]
   sales        Sale[]
   customFieldValues CustomFieldValue[]
+  sensitiveFields   SensitiveField[]
+
+  // Datos específicos de la línea de negocio seleccionada (interestedLine).
+  // Estructura: { line: "MEDICARE" | "OBAMACARE" | "FAMILY_HERITAGE", values: {...} }
+  // — el contrato de campos vive en src/lib/leads/lineSchema.ts, que lo
+  // valida en el servidor y descarta cualquier clave que no pertenezca a la
+  // línea activa (nunca se mezclan campos de líneas distintas). Los datos
+  // restringidos (SSN, banco, clave de seguridad) NUNCA van aquí: van
+  // cifrados en SensitiveField (leadId).
+  lineDetails       Json?
 
   @@index([stageId])
   @@index([agentId])
@@ -449,8 +462,12 @@ model Client {
 
 model SensitiveField {
   id            String   @id @default(cuid())
-  clientId      String
-  client        Client   @relation(fields: [clientId], references: [id])
+  // Un dato sensible pertenece a un Cliente o a un Lead (antes de su
+  // conversión). Al convertir, el valor cifrado se copia al Cliente.
+  clientId      String?
+  client        Client?  @relation(fields: [clientId], references: [id])
+  leadId        String?
+  lead          Lead?    @relation(fields: [leadId], references: [id], onDelete: Cascade)
   fieldKey      String   // "ssn", "bank_account_number", "routing_number"...
   encryptedValue String  // cifrado en reposo (AES-256), nunca texto plano
   maskedPreview String   // ej. "***-**-1234", se puede mostrar sin permiso especial
@@ -460,6 +477,7 @@ model SensitiveField {
   accessLogs SensitiveDataAccessLog[]
 
   @@unique([clientId, fieldKey])
+  @@unique([leadId, fieldKey])
 }
 
 model SensitiveDataAccessLog {

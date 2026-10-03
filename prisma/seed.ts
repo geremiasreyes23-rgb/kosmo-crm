@@ -330,11 +330,14 @@ async function main() {
       { name: "rop", label: "¿Interesado en ROP?", fieldType: "BOOLEAN" },
     ],
   };
+  // Desde la estructura Cliente Común + Línea de negocio, estos campos son
+  // nativos del formulario (src/lib/leads/lineSchema.ts) — se siembran
+  // ocultos (isVisible: false) para no duplicarlos en el formulario.
   for (const [lineName, fields] of Object.entries(lineFieldDefs)) {
     for (const [i, f] of fields.entries()) {
       await prisma.customField.upsert({
         where: { entityType_name: { entityType: "LEAD", name: f.name } },
-        update: { label: f.label, fieldType: f.fieldType, options: f.options ?? undefined, order: i, insuranceLineId: lines[lineName].id },
+        update: { label: f.label, fieldType: f.fieldType, options: f.options ?? undefined, order: i, insuranceLineId: lines[lineName].id, isVisible: false },
         create: {
           entityType: "LEAD",
           name: f.name,
@@ -342,6 +345,7 @@ async function main() {
           fieldType: f.fieldType,
           options: f.options ?? undefined,
           order: i,
+          isVisible: false,
           insuranceLineId: lines[lineName].id,
         },
       });

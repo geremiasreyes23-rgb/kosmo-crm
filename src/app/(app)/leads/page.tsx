@@ -19,6 +19,7 @@ export default async function LeadsPage() {
       formOptions={formOptions}
       canAssignOthers={canViewAll(user)}
       currentUserName={`${user.firstName} ${user.lastName}`}
+      currentAgentId={user.agentId}
     />
   );
 }
