@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
 import { mentionToken, EVERYONE_MENTION_ID } from "@/lib/feed/mentions";
 import type { FeedUserOption } from "@/types";
@@ -28,6 +28,7 @@ export function MentionTextarea({
   className,
   onSubmitShortcut,
   autoFocus,
+  maxHeight = 480,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -37,8 +38,21 @@ export function MentionTextarea({
   className?: string;
   onSubmitShortcut?: () => void;
   autoFocus?: boolean;
+  /** Alto máximo (px) al crecer con el texto; pasado ese alto aparece scroll. */
+  maxHeight?: number;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+
+  // El cuadro crece con el texto (pegar o escribir varias líneas) para que
+  // se vea completo, hasta maxHeight; después hace scroll por dentro.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const next = Math.min(el.scrollHeight + 2, maxHeight);
+    el.style.height = `${next}px`;
+    el.style.overflowY = el.scrollHeight + 2 > maxHeight ? "auto" : "hidden";
+  }, [value, maxHeight]);
   const [query, setQuery] = useState<string | null>(null);
   const [triggerIndex, setTriggerIndex] = useState(-1);
 
