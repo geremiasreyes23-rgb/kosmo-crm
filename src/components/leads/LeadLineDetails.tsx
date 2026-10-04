@@ -12,6 +12,7 @@ import {
 import { Turning65Alert } from "@/components/leads/form/LineFields";
 import { LeadRestrictedPanel, type RestrictedItem } from "@/components/leads/LeadRestrictedPanel";
 import { LeadRestrictedValue } from "@/components/leads/LeadRestrictedValue";
+import { HScroll } from "@/components/ui/HScroll";
 
 /** Vista de solo lectura de "Información de [línea]" en el detalle del lead.
  * Muestra exclusivamente los campos de la línea del lead. */
@@ -90,7 +91,7 @@ export function LeadLineDetails({
                         {items.length === 0 ? (
                           <span className="font-medium">{none ? f.noneLabel : "—"}</span>
                         ) : (
-                          <div className="overflow-x-auto rounded-lg border border-[var(--border-hairline)]">
+                          <HScroll className="rounded-lg border border-[var(--border-hairline)]" innerClassName="rounded-lg">
                             <table className="w-full text-sm">
                               <thead className="bg-[var(--surface-sunken)] text-xs text-[var(--ink-muted)]">
                                 <tr>
@@ -135,7 +136,7 @@ export function LeadLineDetails({
                                 ))}
                               </tbody>
                             </table>
-                          </div>
+                          </HScroll>
                         )}
                       </dd>
                     </div>

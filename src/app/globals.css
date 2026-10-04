@@ -114,6 +114,15 @@ body {
   border-radius: 8px;
 }
 
+/* Contenedores con desplazamiento horizontal (HScroll): sin barra visible,
+   se desplazan con los deslizadores que aparecen al pasar el mouse. */
+.kosmo-no-scrollbar {
+  scrollbar-width: none;
+}
+.kosmo-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* ————————————————————————————————————————————————————————————
    Animaciones — set compartido de keyframes para micro-interacciones
    (Drawer, Tabs, Kanban, menús, etc.) para no repetirlos por componente.

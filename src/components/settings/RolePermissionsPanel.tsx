@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { HScroll } from "@/components/ui/HScroll";
 import { NAV_MODULES } from "@/lib/navModules";
 import {
   setRolePermissionAction,
@@ -190,7 +191,7 @@ export function RolePermissionsPanel({
         <>
           <div>
             <h3 className="mb-2 text-sm font-semibold">Permisos por módulo</h3>
-            <div className="overflow-x-auto rounded-lg border border-[var(--border-hairline)]">
+            <HScroll className="rounded-lg border border-[var(--border-hairline)]" innerClassName="rounded-lg">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--border-hairline)] bg-[var(--surface-sunken)]">
@@ -226,7 +227,7 @@ export function RolePermissionsPanel({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </HScroll>
           </div>
 
           <div>

@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { useState, type ReactNode } from "react";
+import { HScroll } from "@/components/ui/HScroll";
 
 interface Tab {
   id: string;
@@ -15,7 +16,7 @@ export function Tabs({ tabs, defaultTab }: { tabs: Tab[]; defaultTab?: string })
 
   return (
     <div>
-      <div className="flex gap-1 overflow-x-auto border-b border-[var(--border-grid)]">
+      <HScroll size="sm" className="border-b border-[var(--border-grid)]" innerClassName="flex gap-1">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -30,7 +31,7 @@ export function Tabs({ tabs, defaultTab }: { tabs: Tab[]; defaultTab?: string })
             {tab.label}
           </button>
         ))}
-      </div>
+      </HScroll>
       <div key={active} className="animate-kosmo-fade-in-up pt-4">
         {activeTab?.content}
       </div>

@@ -1,11 +1,12 @@
 import { cn } from "@/lib/utils";
+import { HScroll } from "@/components/ui/HScroll";
 import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from "react";
 
 export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="w-full overflow-x-auto">
+    <HScroll className="w-full">
       <table className={cn("w-full border-collapse text-sm", className)} {...props} />
-    </div>
+    </HScroll>
   );
 }
 

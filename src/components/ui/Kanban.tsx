@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import type { PipelineStage } from "@/types";
 import { buildStageColorMap } from "@/lib/pipelineColors";
 import { cn, formatCurrency } from "@/lib/utils";
+import { HScroll } from "@/components/ui/HScroll";
 
 /**
  * Tablero Kanban con drag & drop real (HTML5 DnD nativo, sin dependencias
@@ -42,7 +43,7 @@ export function KanbanBoard<T extends { id: string }>({
   const [justDroppedId, setJustDroppedId] = useState<string | null>(null);
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
+    <HScroll stickyArrows innerClassName="flex gap-3 pb-2">
       {stages.map((stage) => {
         const stageItems = items.filter((item) => getStageId(item) === stage.id);
         const color = colors[stage.id];
@@ -152,6 +153,6 @@ export function KanbanBoard<T extends { id: string }>({
           </div>
         );
       })}
-    </div>
+    </HScroll>
   );
 }

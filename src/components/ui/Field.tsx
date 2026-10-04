@@ -17,11 +17,23 @@ export function FieldWrapper({ label, children }: { label: ReactNode; children: 
   );
 }
 
+/** cn() no fusiona clases de Tailwind en conflicto, así que si quien usa el
+ * campo pasa su propio ancho (w-40) o redondeo (rounded-full), la clase por
+ * defecto (w-full / rounded-lg) se omite para que la suya sí se aplique. */
+function baseField(className?: string) {
+  const c = className ?? "";
+  return cn(
+    "h-9 border border-[var(--border-hairline)] bg-[var(--surface-card)] px-3 text-sm outline-none focus:border-[var(--brand-500)]",
+    !/(^|\s)w-/.test(c) && "w-full",
+    !/(^|\s)rounded(-|\s|$)/.test(c) && "rounded-lg"
+  );
+}
+
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       className={cn(
-        "h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-card)] px-3 text-sm outline-none focus:border-[var(--brand-500)]",
+        baseField(className),
         className
       )}
       {...props}
@@ -33,7 +45,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
   return (
     <select
       className={cn(
-        "h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-card)] px-3 text-sm outline-none focus:border-[var(--brand-500)]",
+        baseField(className),
         className
       )}
       {...props}
