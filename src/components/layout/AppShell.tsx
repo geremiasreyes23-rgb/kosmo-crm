@@ -7,6 +7,7 @@ import { MessengerProvider } from "@/components/messenger/MessengerProvider";
 import { NotificationProvider } from "@/components/notifications/NotificationProvider";
 import { ToastNotificationProvider } from "@/components/notifications/ToastNotificationProvider";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { DailyReportProvider } from "@/components/daily-report/DailyReportProvider";
 import type { SessionUser } from "@/lib/auth";
 import type { TimeEntryPayload } from "@/app/(app)/clock-actions";
 import type { ProfileViewData } from "@/app/(app)/profile/data";
@@ -21,6 +22,7 @@ export function AppShell({
   messengerData,
   notificationData,
   visibleModuleKeys,
+  canDailyReport = false,
 }: {
   children: ReactNode;
   user: SessionUser;
@@ -32,6 +34,9 @@ export function AppShell({
    * src/app/(app)/layout.tsx (de ahí sale calculado) y Configuración →
    * Roles y permisos → "Visibilidad de módulos" (de ahí se edita). */
   visibleModuleKeys: Set<string>;
+  /** Puede registrar reportes diarios (activities:create) — habilita el
+   * modal de Reporte diario (recordatorio + reloj de la jornada). */
+  canDailyReport?: boolean;
 }) {
   return (
     // ToastNotificationProvider va afuera de todo — así tanto
@@ -43,6 +48,7 @@ export function AppShell({
     <ToastNotificationProvider>
       <MessengerProvider initialData={messengerData}>
         <NotificationProvider initialData={notificationData}>
+        <DailyReportProvider userId={user.id} enabled={canDailyReport}>
           {/* El wrapper exterior lleva el mismo degradado morado→negro que
               Sidebar/Header (CHROME_GRADIENT_STYLE, con backgroundAttachment
               fixed para que coincida sin costuras). Antes el <main> ocupaba
@@ -62,6 +68,7 @@ export function AppShell({
               </main>
             </div>
           </div>
+        </DailyReportProvider>
         </NotificationProvider>
       </MessengerProvider>
     </ToastNotificationProvider>

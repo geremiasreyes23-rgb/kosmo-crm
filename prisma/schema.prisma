@@ -81,6 +81,7 @@ model User {
   activities            Activity[]
   dailyReports          DailyReport[] @relation("DailyReportAuthor")
   dailyReportsReviewed  DailyReport[] @relation("DailyReportReviewer")
+  dailyReportDrafts     DailyReportDraft[]
   appointments          Appointment[]
   notifications         Notification[]
   auditLogs             AuditLog[]
@@ -888,6 +889,21 @@ model DailyReport {
 
   @@index([userId])
   @@index([status])
+}
+
+// Borrador del reporte diario ("Guardar" en el modal de Reporte diario) —
+// uno por usuario y día. Se borra cuando el reporte se envía al supervisor.
+// `day` es la fecha local del usuario (YYYY-MM-DD), para que "hoy" respete
+// su zona horaria y no la del servidor.
+model DailyReportDraft {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day       String
+  content   String
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, day])
 }
 
 enum DailyReportStatus {

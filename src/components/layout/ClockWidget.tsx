@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Activity, Clock, Pause, Play, Square } from "lucide-react";
 import { clockInAction, pauseAction, resumeAction, finishAction, type TimeEntryPayload } from "@/app/(app)/clock-actions";
 import { cn } from "@/lib/utils";
+import { useDailyReport } from "@/components/daily-report/DailyReportProvider";
 
 /**
  * "Smart Clock" — control de jornada dentro del dropdown del perfil.
@@ -52,6 +53,8 @@ export function ClockWidget({ initialEntry }: { initialEntry: TimeEntryPayload |
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Acceso manual al Reporte diario (null si el usuario no registra reportes).
+  const dailyReport = useDailyReport();
 
   // Solo corre el reloj mientras está "En el trabajo" — en pausa se congela
   // en el momento en que se pausó, no sigue sumando.
@@ -138,7 +141,8 @@ export function ClockWidget({ initialEntry }: { initialEntry: TimeEntryPayload |
               (Iniciar/Finalizar) de abajo, que es la que pidió ocupar todo
               el ancho. La función ya existía y sigue disponible, solo
               cambió dónde vive visualmente. */}
-          {entry ? (
+          <div className="flex shrink-0 items-center gap-0.5">
+          {entry && (
             <button
               type="button"
               disabled={busy}
@@ -153,9 +157,28 @@ export function ClockWidget({ initialEntry }: { initialEntry: TimeEntryPayload |
             >
               {isWorking ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
             </button>
-          ) : (
-            <Clock className="h-3.5 w-3.5 shrink-0 text-[var(--ink-muted)]" />
           )}
+          {/* Reloj = acceso manual al Reporte diario. Solo abre el modal: no
+              inicia, pausa ni modifica la jornada ni el contador. */}
+          {dailyReport ? (
+            <button
+              type="button"
+              onClick={dailyReport.openReport}
+              aria-label="Reporte diario"
+              className="group/report relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-black/5 hover:text-[var(--ink-primary)]"
+            >
+              <Clock className="h-3.5 w-3.5" />
+              {dailyReport.hasPending && (
+                <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-[var(--brand-500)] ring-2 ring-[var(--surface-card)]" />
+              )}
+              <span className="pointer-events-none absolute right-full top-1/2 mr-1.5 -translate-y-1/2 whitespace-nowrap rounded-md bg-[var(--ink-primary)] px-2 py-1 text-[11px] font-medium text-[var(--surface-card)] opacity-0 shadow-md transition-opacity duration-150 group-hover/report:opacity-100">
+                Reporte diario
+              </span>
+            </button>
+          ) : (
+            !entry && <Clock className="h-3.5 w-3.5 shrink-0 text-[var(--ink-muted)]" />
+          )}
+          </div>
         </div>
 
         {/* 2. Contador principal */}

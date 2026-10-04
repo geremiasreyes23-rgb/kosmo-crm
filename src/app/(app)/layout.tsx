@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/layout/AppShell";
-import { requireUser } from "@/lib/auth";
+import { requireUser, hasPermission } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { NAV_MODULE_KEYS } from "@/lib/navModules";
 import { getProfileViewData } from "./profile/data";
@@ -96,6 +96,7 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
       messengerData={messengerData}
       notificationData={notificationData}
       visibleModuleKeys={visibleModuleKeys}
+      canDailyReport={hasPermission(user, "activities", "create")}
     >
       {children}
     </AppShell>
