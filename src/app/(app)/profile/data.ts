@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/db";
+import { canManageSupervisors } from "@/lib/supervisor";
 import { formatRelativeTime } from "@/lib/utils";
 import { isUserOnline } from "@/lib/presence";
 import type { SessionUser } from "@/lib/auth";
@@ -57,6 +58,8 @@ export interface ProfileViewData {
     workFormat: string;
     supervisorId: string;
     supervisorName: string;
+    /** Solo Admin / Super Admin pueden cambiar el supervisor. */
+    canEditSupervisor: boolean;
   };
 }
 
@@ -204,6 +207,7 @@ export async function getProfileViewData(sessionUser: SessionUser): Promise<Prof
       workFormat: user.workFormat ?? "",
       supervisorId: user.supervisorId ?? "",
       supervisorName: supervisorName ?? "",
+      canEditSupervisor: canManageSupervisors(sessionUser.roleName),
     },
   };
 }

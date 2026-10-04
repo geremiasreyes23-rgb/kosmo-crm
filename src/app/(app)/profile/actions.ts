@@ -3,6 +3,7 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { NOTIFICATION_LANGUAGES, WORK_FORMATS } from "@/lib/profileOptions";
+import { canManageSupervisors, validateSupervisor } from "@/lib/supervisor";
 
 const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
 // ~1.5 MB de imagen real, ya codificada en base64 (que pesa ~33% más que el
@@ -68,6 +69,7 @@ export async function updateCoverPhotoAction(
  * pide recién al entrar en "Editar perfil", no en cada carga de página. */
 export async function getSupervisorOptionsAction(): Promise<{ id: string; name: string }[]> {
   const user = await requireUser();
+  if (!canManageSupervisors(user.roleName)) return [];
   const rows = await prisma.user.findMany({
     where: { status: "ACTIVE", id: { not: user.id } },
     select: { id: true, firstName: true, lastName: true },
@@ -98,24 +100,14 @@ export async function updateProfileAction(input: {
   }
   let supervisorId: string | null | undefined = undefined;
   if (input.supervisorId !== undefined) {
+    // Solo Admin / Super Admin pueden cambiar el supervisor.
+    if (!canManageSupervisors(user.roleName)) {
+      return { ok: false, error: "Solo un administrador puede cambiar el supervisor." };
+    }
     supervisorId = input.supervisorId || null;
     if (supervisorId) {
-      if (supervisorId === user.id) return { ok: false, error: "No puedes ser tu propio supervisor." };
-      // Evita ciclos: el supervisor elegido no puede depender (directa o
-      // indirectamente) de este usuario.
-      let cursor: string | null = supervisorId;
-      for (let i = 0; cursor && i < 20; i++) {
-        const row: { status: string; supervisorId: string | null } | null = await prisma.user.findUnique({
-          where: { id: cursor },
-          select: { status: true, supervisorId: true },
-        });
-        if (!row) return { ok: false, error: "El supervisor seleccionado ya no existe." };
-        if (i === 0 && row.status !== "ACTIVE") return { ok: false, error: "El supervisor seleccionado no está activo." };
-        if (row.supervisorId === user.id) {
-          return { ok: false, error: "Esa persona está bajo tu supervisión; no puede ser tu supervisor." };
-        }
-        cursor = row.supervisorId;
-      }
+      const err = await validateSupervisor(user.id, supervisorId);
+      if (err) return { ok: false, error: err };
     }
   }
 

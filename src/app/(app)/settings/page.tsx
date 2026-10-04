@@ -105,6 +105,7 @@ export default async function SettingsPage() {
     status: u.status,
     roleId: u.roleId,
     roleName: u.role.name,
+    supervisorId: u.supervisorId ?? "",
     lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
   }));
   const customFieldRows: CustomFieldRow[] = dbCustomFields.map((f) => ({

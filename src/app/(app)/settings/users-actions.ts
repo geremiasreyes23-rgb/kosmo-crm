@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireUser, hashPassword, generateTempPassword } from "@/lib/auth";
 import { ensureMailboxForUser } from "@/lib/mail/mailbox";
 import { logAudit } from "@/lib/audit";
+import { validateSupervisor } from "@/lib/supervisor";
 
 const MANAGER_ROLES = ["Super Admin", "Admin"];
 
@@ -103,11 +104,18 @@ export async function createUserAction(input: {
 
 export async function updateUserAction(
   userId: string,
-  input: { firstName: string; lastName: string; email: string; roleId: string }
+  input: { firstName: string; lastName: string; email: string; roleId: string; supervisorId?: string }
 ): Promise<UserActionResult> {
   const { current, error } = await requireUserManager();
   if (error) return { ok: false, error };
   if (!current) return { ok: false, error: "No autorizado." };
+
+  // Supervisor: undefined = no se toca; "" = sin supervisor.
+  const supervisorId = input.supervisorId === undefined ? undefined : input.supervisorId || null;
+  if (supervisorId) {
+    const supervisorError = await validateSupervisor(userId, supervisorId);
+    if (supervisorError) return { ok: false, error: supervisorError };
+  }
 
   const firstName = input.firstName.trim();
   const lastName = input.lastName.trim();
@@ -144,7 +152,7 @@ export async function updateUserAction(
 
   const updated = await prisma.user.update({
     where: { id: userId },
-    data: { firstName, lastName, email, roleId: input.roleId },
+    data: { firstName, lastName, email, roleId: input.roleId, supervisorId },
   });
 
   // Mantiene el registro de Agente (nombre/correo) en sincronía — es el

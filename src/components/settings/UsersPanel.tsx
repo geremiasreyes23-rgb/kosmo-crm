@@ -10,6 +10,7 @@ import { Modal } from "@/components/ui/Modal";
 import { FieldWrapper, Input, Select } from "@/components/ui/Field";
 import { formatDate } from "@/lib/utils";
 import { PersonChip } from "@/components/ui/PersonAvatar";
+import { PersonSelect, userOptions } from "@/components/ui/PersonSelect";
 import {
   createUserAction,
   updateUserAction,
@@ -26,6 +27,7 @@ export interface UserRow {
   status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
   roleId: string;
   roleName: string;
+  supervisorId: string;
   lastLoginAt: string | null;
 }
 
@@ -34,7 +36,7 @@ export interface RoleOption {
   name: string;
 }
 
-const emptyForm = { firstName: "", lastName: "", email: "", roleId: "" };
+const emptyForm = { firstName: "", lastName: "", email: "", roleId: "", supervisorId: "" };
 
 export function UsersPanel({
   initialUsers,
@@ -73,7 +75,13 @@ export function UsersPanel({
 
   function openEdit(user: UserRow) {
     setEditingUser(user);
-    setForm({ firstName: user.firstName, lastName: user.lastName, email: user.email, roleId: user.roleId });
+    setForm({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      roleId: user.roleId,
+      supervisorId: user.supervisorId,
+    });
     setFormError(null);
     setDrawerOpen(true);
   }
@@ -275,6 +283,20 @@ export function UsersPanel({
               ))}
             </Select>
           </FieldWrapper>
+          {editingUser && (
+            <FieldWrapper label="Supervisor">
+              <PersonSelect
+                value={form.supervisorId}
+                onChange={(v) => setForm({ ...form, supervisorId: v })}
+                options={userOptions(
+                  initialUsers
+                    .filter((u) => u.id !== editingUser.id && u.status === "ACTIVE")
+                    .map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}` }))
+                )}
+                emptyLabel="Sin supervisor"
+              />
+            </FieldWrapper>
+          )}
           {formError && (
             <p className="rounded-lg border border-red-200 bg-[var(--status-critical-bg)] px-3 py-2 text-xs text-[var(--status-critical)]">
               {formError}

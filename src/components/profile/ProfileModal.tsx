@@ -155,6 +155,7 @@ export function ProfileModal({
     workFormat: user.workFormat,
     supervisorId: user.supervisorId,
   };
+  const canEditSupervisor = user.canEditSupervisor;
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(savedValues);
   const [saving, setSaving] = useState(false);
@@ -239,7 +240,7 @@ export function ProfileModal({
     setForm(savedValues);
     setFormError(null);
     setEditing(true);
-    if (!supervisorOptions) {
+    if (canEditSupervisor && !supervisorOptions) {
       getSupervisorOptionsAction()
         .then(setSupervisorOptions)
         .catch(() => setSupervisorOptions([]));
@@ -268,7 +269,16 @@ export function ProfileModal({
       display: supervisorLabel ? (
         <PersonChip name={supervisorLabel} person={{ userId: form.supervisorId }} size={20} className="text-sm font-medium text-[var(--ink-primary)]" />
       ) : undefined,
-      input: (
+      input: !canEditSupervisor ? (
+        <div className="min-w-0">
+          {supervisorLabel ? (
+            <PersonChip name={supervisorLabel} person={{ userId: form.supervisorId }} size={20} className="text-sm font-medium text-[var(--ink-primary)]" />
+          ) : (
+            <p className="text-sm text-[var(--ink-muted)]">No especificado</p>
+          )}
+          <p className="mt-0.5 text-[11px] text-[var(--ink-muted)]">Solo un administrador puede cambiarlo.</p>
+        </div>
+      ) : (
         <div className="pt-1">
           <PersonSelect
             size="sm"
@@ -339,7 +349,10 @@ export function ProfileModal({
   async function handleSave() {
     setSaving(true);
     setFormError(null);
-    const result = await updateProfileAction(form);
+    // Quien no es administrador no envía el supervisor (el servidor lo rechazaría).
+    const { supervisorId, ...rest } = form;
+    const result = await updateProfileAction(canEditSupervisor ? form : rest);
+    void supervisorId;
     setSaving(false);
 
     if (!result.ok) {
