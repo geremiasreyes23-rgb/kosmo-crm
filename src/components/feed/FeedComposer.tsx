@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Field";
 import { MentionTextarea } from "@/components/feed/MentionTextarea";
+import { PersonSelect, userOptions } from "@/components/ui/PersonSelect";
 import { FeedAvatar } from "@/components/feed/FeedAvatar";
 import { createPostAction, type FeedAttachmentInput } from "@/lib/feed/actions";
 import { formatBytes } from "@/lib/utils";
@@ -183,18 +184,15 @@ export function FeedComposer({
               </Select>
 
               {audience === "SPECIFIC" && (
-                <Select
+                <PersonSelect
                   multiple
+                  size="sm"
+                  className="w-56"
                   value={specificIds}
-                  onChange={(e) => setSpecificIds(Array.from(e.target.selectedOptions).map((o) => o.value))}
-                  className="!h-8 w-40 text-xs"
-                >
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </Select>
+                  onChange={setSpecificIds}
+                  options={userOptions(users)}
+                  placeholder="Elige usuarios..."
+                />
               )}
             </div>
 

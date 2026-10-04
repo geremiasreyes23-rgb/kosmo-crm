@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
+import { PersonAvatar } from "@/components/ui/PersonAvatar";
 import { mentionToken, EVERYONE_MENTION_ID } from "@/lib/feed/mentions";
 import type { FeedUserOption } from "@/types";
 
@@ -142,7 +143,14 @@ export function MentionTextarea({
               }}
               className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-[var(--surface-hover)]"
             >
-              <span className="font-medium text-[var(--ink-primary)]">@{opt.name}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                {opt.id === EVERYONE_MENTION_ID ? (
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--brand-100)] text-[10px] font-bold text-[var(--brand-700)]">@</span>
+                ) : (
+                  <PersonAvatar name={opt.name} person={{ userId: opt.id }} size={20} />
+                )}
+                <span className="truncate font-medium text-[var(--ink-primary)]">@{opt.name}</span>
+              </span>
               {opt.department && <span className="text-xs text-[var(--ink-secondary)]">{opt.department}</span>}
             </button>
           ))}

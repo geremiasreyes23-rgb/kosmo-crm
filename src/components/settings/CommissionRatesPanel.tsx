@@ -15,6 +15,8 @@ import {
 } from "@/app/(app)/settings/commission-rates-actions";
 import type { CommissionRateVM } from "@/types";
 import { formatDate } from "@/lib/utils";
+import { PersonSelect, agentOptions } from "@/components/ui/PersonSelect";
+import { PersonChip } from "@/components/ui/PersonAvatar";
 
 const emptyForm = {
   insuranceLineId: "",
@@ -132,7 +134,7 @@ export function CommissionRatesPanel({
           {initialRates.map((r) => (
             <Tr key={r.id}>
               <Td>{r.lineName}</Td>
-              <Td>{r.agentName ?? <span className="text-[var(--ink-muted)]">Base (toda la línea)</span>}</Td>
+              <Td>{r.agentName ? <PersonChip name={r.agentName} person={{ agentId: r.agentId }} /> : <span className="text-[var(--ink-muted)]">Base (toda la línea)</span>}</Td>
               <Td>
                 {r.agentAmountType === "PERCENTAGE" ? `${r.agentAmountOrPct}%` : `$${r.agentAmountOrPct}`}
               </Td>
@@ -196,14 +198,12 @@ export function CommissionRatesPanel({
           </FieldWrapper>
 
           <FieldWrapper label="Agente (opcional, vacío = tarifa base de la línea)">
-            <Select value={form.agentId} onChange={(e) => setForm({ ...form, agentId: e.target.value })}>
-              <option value="">Tarifa base (todos los agentes)</option>
-              {agents.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </Select>
+            <PersonSelect
+              value={form.agentId}
+              onChange={(v) => setForm({ ...form, agentId: v })}
+              options={agentOptions(agents)}
+              emptyLabel="Tarifa base (todos los agentes)"
+            />
           </FieldWrapper>
 
           <div className="grid grid-cols-2 gap-3">

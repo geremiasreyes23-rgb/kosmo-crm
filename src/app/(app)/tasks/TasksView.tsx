@@ -15,6 +15,8 @@ import type { RelatedEntityOptions } from "@/lib/relatedRecords";
 import type { CrmTask } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { Check, Plus } from "lucide-react";
+import { PersonSelect, userOptions } from "@/components/ui/PersonSelect";
+import { PersonChip } from "@/components/ui/PersonAvatar";
 
 function emptyForm() {
   return {
@@ -116,7 +118,9 @@ export function TasksView({
               <Tr key={t.id}>
                 <Td className="font-medium">{t.title}</Td>
                 <Td>{t.relatedTo}</Td>
-                <Td>{t.assignedTo}</Td>
+                <Td>
+                  <PersonChip name={t.assignedTo} person={{ userId: t.assignedToId }} />
+                </Td>
                 <Td>{t.dueDate ? formatDate(t.dueDate) : "—"}</Td>
                 <Td><Badge status={statusToBadgeVariant(t.priority)}>{t.priority}</Badge></Td>
                 <Td><Badge status={statusToBadgeVariant(t.status)}>{t.status}</Badge></Td>
@@ -195,14 +199,12 @@ export function TasksView({
           <div className="grid grid-cols-2 gap-3">
             {canAssignOthers && (
               <FieldWrapper label="Asignado a">
-                <Select value={form.assignedToId} onChange={(e) => setForm({ ...form, assignedToId: e.target.value })}>
-                  <option value="">Yo mismo</option>
-                  {assignableUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </Select>
+                <PersonSelect
+                  value={form.assignedToId}
+                  onChange={(v) => setForm({ ...form, assignedToId: v })}
+                  options={userOptions(assignableUsers)}
+                  emptyLabel="Yo mismo"
+                />
               </FieldWrapper>
             )}
             <FieldWrapper label="Fecha límite">

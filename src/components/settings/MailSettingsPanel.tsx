@@ -14,6 +14,7 @@ import {
 } from "@/app/(app)/settings/mail-settings-actions";
 import { adminInspectMailboxAction } from "@/app/(app)/mail/actions";
 import type { MailRetentionPolicy } from "@prisma/client";
+import { PersonSelect, userOptions as toUserOptions } from "@/components/ui/PersonSelect";
 
 const RETENTION_LABEL: Record<MailRetentionPolicy, string> = {
   DAYS_30: "30 días",
@@ -161,14 +162,12 @@ export function MailSettingsPanel({
           registrado en la auditoría como acceso administrativo excepcional.
         </p>
         <div className="grid gap-3 md:grid-cols-[1fr_2fr_auto]">
-          <Select value={inspectUserId} onChange={(e) => setInspectUserId(e.target.value)}>
-            <option value="">Selecciona un usuario...</option>
-            {userOptions.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </Select>
+          <PersonSelect
+            value={inspectUserId}
+            onChange={setInspectUserId}
+            options={toUserOptions(userOptions)}
+            placeholder="Selecciona un usuario..."
+          />
           <Textarea
             value={inspectReason}
             onChange={(e) => setInspectReason(e.target.value)}

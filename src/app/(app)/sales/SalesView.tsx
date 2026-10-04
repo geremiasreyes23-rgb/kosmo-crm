@@ -14,6 +14,8 @@ import type { RelatedEntityOptions } from "@/lib/relatedRecords";
 import { formatCurrency } from "@/lib/utils";
 import { Plus, Handshake, Search } from "lucide-react";
 import { createSaleAction, moveSaleStageAction } from "./actions";
+import { PersonSelect, agentOptions } from "@/components/ui/PersonSelect";
+import { PersonAvatar } from "@/components/ui/PersonAvatar";
 
 const METHOD_LABELS: Record<SaleMethod, string> = {
   PHONE: "Teléfono",
@@ -170,9 +172,7 @@ export function SalesView({
             </div>
             <div className="mt-2.5 flex items-center justify-between border-t border-[var(--border-grid)] pt-2">
               <div className="flex min-w-0 items-center gap-1.5">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-[9px] font-semibold text-[var(--ink-secondary)]">
-                  {sale.agentName ? sale.agentName.charAt(0).toUpperCase() : "?"}
-                </div>
+                <PersonAvatar name={sale.agentName || "?"} person={{ agentId: sale.agentId }} size={20} />
                 <span className="truncate text-xs text-[var(--ink-muted)]">{sale.agentName}</span>
               </div>
               <span className="shrink-0 text-xs font-semibold text-[var(--brand-600)]">
@@ -285,14 +285,12 @@ export function SalesView({
             </FieldWrapper>
             {canAssignOthers && (
               <FieldWrapper label="Vendedor">
-                <Select value={form.agentId} onChange={(e) => setForm({ ...form, agentId: e.target.value })}>
-                  <option value="">Yo mismo</option>
-                  {formOptions.agents.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </Select>
+                <PersonSelect
+                  value={form.agentId}
+                  onChange={(v) => setForm({ ...form, agentId: v })}
+                  options={agentOptions(formOptions.agents)}
+                  emptyLabel="Yo mismo"
+                />
               </FieldWrapper>
             )}
           </div>

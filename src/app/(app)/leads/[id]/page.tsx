@@ -7,6 +7,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { requireUser, hasPermission, canViewAll } from "@/lib/auth";
 import { getLeadForUser, getLeadPipelineStages, getLeadEditData, getLeadFormOptions } from "../data";
 import { EditLeadButton } from "@/components/leads/EditLeadButton";
+import { PersonAvatar, PersonChip } from "@/components/ui/PersonAvatar";
 import { LeadLineDetails } from "@/components/leads/LeadLineDetails";
 import { LeadRestrictedPanel } from "@/components/leads/LeadRestrictedPanel";
 import { COMMON_SENSITIVE, LINE_DEFS, ageFromDob, getLineDef, turning65, US_STATES } from "@/lib/leads/lineSchema";
@@ -95,7 +96,10 @@ export default async function LeadDetailPage({
             <Cake className="mr-1 h-3 w-3" /> {t65.message}
           </Badge>
         )}
-        <Badge status="neutral">Vendedor: {lead.agentName}</Badge>
+        <Badge status="neutral">
+          <PersonAvatar name={lead.agentName || "?"} person={{ agentId: lead.agentId }} size={16} className="mr-1" />
+          Vendedor: {lead.agentName}
+        </Badge>
         <Badge status="neutral">Creado {formatDate(lead.createdAt)}</Badge>
         {lead.convertedAt && <Badge status="good">Convertido a cliente {formatDate(lead.convertedAt)}</Badge>}
       </div>
@@ -127,8 +131,8 @@ export default async function LeadDetailPage({
                             <Info label="Condado" value={lead.county} />
                             <Info label="Estado" value={US_STATES.find((s) => s.value === lead.state)?.label ?? lead.state} />
                             <Info label="Origen del lead" value={lead.source} />
-                            <Info label="Vendedor" value={lead.agentName} />
-                            <Info label="AOR" value={lead.aorName} />
+                            <Info label="Vendedor" value={<PersonChip name={lead.agentName} person={{ agentId: lead.agentId }} />} />
+                            <Info label="AOR" value={lead.aorName ? <PersonChip name={lead.aorName} person={{ agentId: lead.aorId }} /> : undefined} />
                             <Info label="Último contacto" value={lead.lastContactAt ? formatDate(lead.lastContactAt) : "—"} />
                           </dl>
                           <div className="mt-4">
@@ -257,7 +261,7 @@ export default async function LeadDetailPage({
   );
 }
 
-function Info({ label, value }: { label: string; value?: string }) {
+function Info({ label, value }: { label: string; value?: React.ReactNode }) {
   return (
     <div>
       <dt className="text-xs text-[var(--ink-muted)]">{label}</dt>

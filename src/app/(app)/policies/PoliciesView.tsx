@@ -14,6 +14,8 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { Plus, Search } from "lucide-react";
 import { createPolicyAction, updatePolicyStatusAction } from "./actions";
 import type { PolicyFormOptions } from "./data";
+import { PersonSelect, agentOptions } from "@/components/ui/PersonSelect";
+import { PersonChip } from "@/components/ui/PersonAvatar";
 
 const STATUS_OPTIONS: PolicyStatus[] = [
   "QUOTE",
@@ -208,7 +210,9 @@ export function PoliciesView({
                     ))}
                   </Select>
                 </Td>
-                <Td>{p.agentName}</Td>
+                <Td>
+                  <PersonChip name={p.agentName} person={{ agentId: p.agentId }} />
+                </Td>
               </Tr>
             ))}
             {visiblePolicies.length === 0 && (
@@ -298,14 +302,12 @@ export function PoliciesView({
             </FieldWrapper>
             {canAssignOthers && (
               <FieldWrapper label="Vendedor">
-                <Select value={form.agentId} onChange={(e) => setForm({ ...form, agentId: e.target.value })}>
-                  <option value="">Sin asignar</option>
-                  {formOptions.agents.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </Select>
+                <PersonSelect
+                  value={form.agentId}
+                  onChange={(v) => setForm({ ...form, agentId: v })}
+                  options={agentOptions(formOptions.agents)}
+                  emptyLabel="Sin asignar"
+                />
               </FieldWrapper>
             )}
           </div>

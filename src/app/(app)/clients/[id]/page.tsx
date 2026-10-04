@@ -25,6 +25,7 @@ import { DocumentsTab } from "@/components/records/DocumentsTab";
 import { formatCurrency, formatDate, formatTime, timeSince, calculateAge, formatClientCode } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { ArrowLeftCircle, ClipboardList, ShieldCheck } from "lucide-react";
+import { PersonAvatar } from "@/components/ui/PersonAvatar";
 
 export const dynamic = "force-dynamic";
 
@@ -87,8 +88,16 @@ export default async function ClientDetailPage({
       <div className="mb-4 flex flex-wrap gap-2">
         <Badge status="good">Activo</Badge>
         <Badge status="neutral" className="font-mono">{formatClientCode(client.clientNumber)}</Badge>
-        <Badge status="neutral">Vendedor: {client.agentName}</Badge>
-        {client.aorName && <Badge status="neutral">AOR: {client.aorName}</Badge>}
+        <Badge status="neutral">
+          <PersonAvatar name={client.agentName || "?"} person={{ agentId: client.agentId }} size={16} className="mr-1" />
+          Vendedor: {client.agentName}
+        </Badge>
+        {client.aorName && (
+          <Badge status="neutral">
+            <PersonAvatar name={client.aorName} person={{ agentId: client.aorId }} size={16} className="mr-1" />
+            AOR: {client.aorName}
+          </Badge>
+        )}
         {client.dob && <Badge status="info">{calculateAge(client.dob)} años</Badge>}
       </div>
 

@@ -20,6 +20,8 @@ import { Button } from "@/components/ui/Button";
 import { Select, Textarea } from "@/components/ui/Field";
 import { DynamicField } from "@/components/ui/DynamicField";
 import { AddFieldMenu } from "@/components/ui/AddFieldMenu";
+import { PersonSelect, agentOptions } from "@/components/ui/PersonSelect";
+import { PersonChip } from "@/components/ui/PersonAvatar";
 import { cn, formatBytes } from "@/lib/utils";
 import { createLeadAction, updateLeadAction, type LeadFormPayload } from "@/app/(app)/leads/actions";
 import type { LeadEditData, LeadFormOptions } from "@/app/(app)/leads/data";
@@ -532,27 +534,28 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
               </LeadField>
               <LeadField label={COMMON_LABELS.agentId} required error={err("agentId")} htmlFor="common-agent">
                 {canAssignOthers ? (
-                  <Select id="common-agent" value={common.agentId} onChange={(e) => setCommonField("agentId", e.target.value)} className={err("agentId") ? "border-[var(--status-critical)]" : undefined}>
-                    <option value="">Selecciona...</option>
-                    {formOptions.agents.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </Select>
+                  <PersonSelect
+                    id="common-agent"
+                    value={common.agentId}
+                    onChange={(v) => setCommonField("agentId", v)}
+                    options={agentOptions(formOptions.agents)}
+                    placeholder="Selecciona..."
+                    error={!!err("agentId")}
+                  />
                 ) : (
-                  <input id="common-agent" value={currentUserName} disabled className={cn(inputClass(), "opacity-70")} />
+                  <div id="common-agent" className={cn(inputClass(), "flex items-center opacity-80")}>
+                    <PersonChip name={currentUserName} person={{ agentId: props.currentAgentId }} />
+                  </div>
                 )}
               </LeadField>
               <LeadField label={COMMON_LABELS.aorId} error={err("aorId")} htmlFor="common-aor">
-                <Select id="common-aor" value={common.aorId} onChange={(e) => setCommonField("aorId", e.target.value)}>
-                  <option value="">Sin AOR</option>
-                  {formOptions.aors.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </Select>
+                <PersonSelect
+                  id="common-aor"
+                  value={common.aorId}
+                  onChange={(v) => setCommonField("aorId", v)}
+                  options={agentOptions(formOptions.aors)}
+                  emptyLabel="Sin AOR"
+                />
               </LeadField>
               {mode === "create" && (
                 <LeadField label="Etapa inicial" htmlFor="common-stage">

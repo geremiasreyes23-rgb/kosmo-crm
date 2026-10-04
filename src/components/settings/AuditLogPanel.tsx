@@ -7,6 +7,7 @@ import { Input, Select } from "@/components/ui/Field";
 import type { AuditLogRowVM } from "@/app/(app)/settings/audit-data";
 import { formatDate, formatTime } from "@/lib/utils";
 import { Search, ShieldCheck } from "lucide-react";
+import { PersonChip } from "@/components/ui/PersonAvatar";
 
 const ACTION_LABELS: Record<string, string> = {
   CREATE: "Creación",
@@ -141,7 +142,9 @@ export function AuditLogPanel({ entries }: { entries: AuditLogRowVM[] }) {
                 <Td className="whitespace-nowrap text-xs text-[var(--ink-muted)]">
                   {formatDate(e.createdAt)} · {formatTime(e.createdAt)}
                 </Td>
-                <Td className="font-medium">{e.userName}</Td>
+                <Td className="font-medium">
+                  <PersonChip name={e.userName} person={{ userId: e.userId }} />
+                </Td>
                 <Td>
                   <Badge status={ACTION_BADGE[e.action] ?? "neutral"}>{ACTION_LABELS[e.action] ?? e.action}</Badge>
                 </Td>

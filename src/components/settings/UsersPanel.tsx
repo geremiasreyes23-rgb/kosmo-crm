@@ -9,6 +9,7 @@ import { Table, THead, TBody, Tr, Th, Td } from "@/components/ui/Table";
 import { Modal } from "@/components/ui/Modal";
 import { FieldWrapper, Input, Select } from "@/components/ui/Field";
 import { formatDate } from "@/lib/utils";
+import { PersonChip } from "@/components/ui/PersonAvatar";
 import {
   createUserAction,
   updateUserAction,
@@ -174,7 +175,7 @@ export function UsersPanel({
             return (
               <Tr key={user.id}>
                 <Td className="font-medium">
-                  {user.firstName} {user.lastName}
+                  <PersonChip name={`${user.firstName} ${user.lastName}`} person={{ userId: user.id }} size={26} />
                   {isSelf && <span className="ml-1.5 text-xs text-[var(--ink-muted)]">(tú)</span>}
                 </Td>
                 <Td>{user.email}</Td>

@@ -16,6 +16,8 @@ import type { ClientFormOptions } from "./data";
 import type { Client } from "@/types";
 import { formatDate, calculateAge, formatClientCode } from "@/lib/utils";
 import { Plus, Search } from "lucide-react";
+import { PersonSelect, agentOptions } from "@/components/ui/PersonSelect";
+import { PersonChip } from "@/components/ui/PersonAvatar";
 
 function initials(first: string, last: string) {
   return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
@@ -150,14 +152,14 @@ export function ClientsView({
           ))}
         </Select>
         {canAssignOthers && (
-          <Select className="w-40 rounded-full" value={agentFilter} onChange={(e) => setAgentFilter(e.target.value)}>
-            <option value="">Vendedor</option>
-            {formOptions.agents.map((a) => (
-              <option key={a.id} value={a.name}>
-                {a.name}
-              </option>
-            ))}
-          </Select>
+          <PersonSelect
+            className="w-52"
+            variant="pill"
+            value={agentFilter}
+            onChange={setAgentFilter}
+            options={agentOptions(formOptions.agents, "name")}
+            emptyLabel="Vendedor"
+          />
         )}
       </div>
 
@@ -198,7 +200,9 @@ export function ClientsView({
                   </div>
                 </Td>
                 <Td>{c.activePolicies}</Td>
-                <Td>{c.agentName}</Td>
+                <Td>
+                  <PersonChip name={c.agentName} person={{ agentId: c.agentId }} />
+                </Td>
                 <Td>{formatDate(c.createdAt)}</Td>
               </Tr>
             ))}
@@ -271,14 +275,12 @@ export function ClientsView({
           </FieldWrapper>
           {canAssignOthers && (
             <FieldWrapper label="Vendedor">
-              <Select value={form.agentId} onChange={(e) => setForm({ ...form, agentId: e.target.value })}>
-                <option value="">Sin asignar</option>
-                {formOptions.agents.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </Select>
+              <PersonSelect
+                value={form.agentId}
+                onChange={(v) => setForm({ ...form, agentId: v })}
+                options={agentOptions(formOptions.agents)}
+                emptyLabel="Sin asignar"
+              />
             </FieldWrapper>
           )}
         </div>

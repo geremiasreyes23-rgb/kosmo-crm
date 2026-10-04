@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Field";
 import { KanbanBoard } from "@/components/ui/Kanban";
 import { LeadFormDrawer } from "@/components/leads/form/LeadFormDrawer";
+import { PersonSelect, agentOptions } from "@/components/ui/PersonSelect";
+import { PersonAvatar, PersonChip } from "@/components/ui/PersonAvatar";
 import { turning65 } from "@/lib/leads/lineSchema";
 import { moveLeadStageAction } from "./actions";
 import type { LeadFormOptions } from "./data";
@@ -157,14 +159,14 @@ export function LeadsView({
           ))}
         </Select>
         {canAssignOthers && (
-          <Select className="w-40 rounded-full" value={agentFilter} onChange={(e) => setAgentFilter(e.target.value)}>
-            <option value="">Vendedor</option>
-            {formOptions.agents.map((a) => (
-              <option key={a.id} value={a.name}>
-                {a.name}
-              </option>
-            ))}
-          </Select>
+          <PersonSelect
+            className="w-52"
+            variant="pill"
+            value={agentFilter}
+            onChange={setAgentFilter}
+            options={agentOptions(formOptions.agents, "name")}
+            emptyLabel="Vendedor"
+          />
         )}
       </div>
 
@@ -206,9 +208,7 @@ export function LeadsView({
               )}
               <div className="mt-2.5 flex items-center justify-between border-t border-[var(--border-grid)] pt-2">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-[9px] font-semibold text-[var(--ink-secondary)]">
-                    {lead.agentName ? lead.agentName.charAt(0).toUpperCase() : "?"}
-                  </div>
+                  <PersonAvatar name={lead.agentName || "?"} person={{ agentId: lead.agentId }} size={20} />
                   <span className="truncate text-xs text-[var(--ink-muted)]">{lead.agentName}</span>
                 </div>
                 <span className="shrink-0 text-xs text-[var(--ink-muted)]">{formatDate(lead.createdAt)}</span>
@@ -251,7 +251,9 @@ export function LeadsView({
                       <span className="text-xs text-[var(--ink-muted)]">—</span>
                     )}
                   </Td>
-                  <Td>{lead.agentName}</Td>
+                  <Td>
+                    <PersonChip name={lead.agentName} person={{ agentId: lead.agentId }} />
+                  </Td>
                   <Td>
                     <Badge status="info">{stageName(stages, lead.stageId)}</Badge>
                   </Td>

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 
 export interface AuditLogRowVM {
   id: string;
+  userId: string;
   userName: string;
   action: string;
   entityType: string;
@@ -33,6 +34,7 @@ export async function getAuditLogEntries(): Promise<AuditLogRowVM[]> {
   });
   return rows.map((r) => ({
     id: r.id,
+    userId: r.userId,
     userName: `${r.user.firstName} ${r.user.lastName}`,
     action: r.action,
     entityType: r.entityType,

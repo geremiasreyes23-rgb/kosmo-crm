@@ -48,6 +48,8 @@ export interface Lead {
   convertedAt?: string;
   /** ID visible del lead ("ID de cliente"), ej. "L-000123". */
   leadCode?: string;
+  agentId?: string;
+  aorId?: string;
   dob?: string;
   address?: string;
   zipCode?: string;
