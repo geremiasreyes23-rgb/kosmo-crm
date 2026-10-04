@@ -250,7 +250,7 @@ export function DailyReportProvider({
       {children}
       {enabled && open && (
         <div
-          className="animate-kosmo-fade-in fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+          className="animate-kosmo-fade-in fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px] sm:p-6"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) close();
           }}
@@ -259,33 +259,33 @@ export function DailyReportProvider({
             role="dialog"
             aria-modal="true"
             aria-labelledby="daily-report-title"
-            className="animate-kosmo-fade-in-scale w-full max-w-lg overflow-hidden rounded-xl bg-[var(--surface-card)] shadow-xl"
+            className="animate-kosmo-fade-in-scale flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-[var(--surface-card)] shadow-2xl"
           >
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--border-hairline)] px-5 py-4">
-              <div className="flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-50)] text-[var(--brand-600)]">
-                  <ClipboardList className="h-5 w-5" />
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--border-hairline)] px-8 py-6">
+              <div className="flex items-center gap-4">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--brand-50)] text-[var(--brand-600)]">
+                  <ClipboardList className="h-6 w-6" />
                 </span>
                 <div>
-                  <h2 id="daily-report-title" className="text-base font-semibold text-[var(--ink-primary)]">
+                  <h2 id="daily-report-title" className="text-xl font-semibold text-[var(--ink-primary)]">
                     Reporte diario
                   </h2>
-                  <p className="mt-0.5 text-xs text-[var(--ink-muted)]">No olvides registrar tus actividades del día.</p>
+                  <p className="mt-1 text-sm text-[var(--ink-muted)]">No olvides registrar tus actividades del día.</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={close}
-                className="rounded-md p-1 text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)]"
+                className="rounded-lg p-1.5 text-[var(--ink-secondary)] hover:bg-[var(--surface-hover)]"
                 aria-label="Cerrar"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="space-y-3 px-5 py-4">
-              <div className="flex items-start gap-2.5 rounded-lg border border-[var(--brand-100)] bg-[var(--brand-50)] px-3 py-2.5 text-sm text-[var(--ink-secondary)]">
-                <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-600)]" />
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-8 py-7">
+              <div className="flex items-start gap-3.5 rounded-xl border border-[var(--brand-100)] bg-[var(--brand-50)] px-5 py-4 text-sm leading-relaxed text-[var(--ink-secondary)]">
+                <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-[var(--brand-600)]" />
                 <p>
                   Es importante mantener tu reporte actualizado.
                   <br />
@@ -303,13 +303,13 @@ export function DailyReportProvider({
                     if (error) setError(null);
                   }}
                   placeholder="Escribe aquí tu reporte del día..."
-                  rows={7}
+                  rows={10}
                   className={cn(
-                    "w-full resize-none rounded-lg border bg-[var(--surface-card)] px-3 py-2 text-sm outline-none focus:border-[var(--brand-500)]",
+                    "min-h-[240px] w-full resize-y rounded-xl border bg-[var(--surface-card)] px-4 py-3.5 text-sm leading-relaxed outline-none transition-shadow focus:border-[var(--brand-500)] focus:ring-4 focus:ring-[var(--brand-500)]/10",
                     error ? "border-[var(--status-critical)]" : "border-[var(--border-hairline)]"
                   )}
                 />
-                <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-[var(--ink-muted)]">
+                <div className="mt-2 flex items-center justify-between gap-3 text-xs text-[var(--ink-muted)]">
                   <span>Se guardará automáticamente con la fecha y hora de envío.</span>
                   <span className={cn("tabular-nums", text.length >= MAX_LENGTH && "text-[var(--status-critical)]")}>
                     {text.length}/{MAX_LENGTH}
@@ -325,12 +325,12 @@ export function DailyReportProvider({
               {savedFlash && !error && <p className="text-xs font-medium text-[var(--status-good)]">✓ Borrador guardado</p>}
             </div>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-[var(--border-hairline)] bg-[var(--surface-sunken)] px-5 py-3.5 sm:flex-row sm:items-center sm:justify-end">
+            <div className="flex flex-col-reverse gap-3 border-t border-[var(--border-hairline)] bg-[var(--surface-sunken)] px-8 py-5 sm:flex-row sm:items-center sm:justify-end">
               <button
                 type="button"
                 onClick={remindLater}
                 disabled={!!busy}
-                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium text-[var(--ink-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--ink-primary)] disabled:opacity-50 sm:mr-auto"
+                className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-medium text-[var(--ink-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--ink-primary)] disabled:opacity-50 sm:mr-auto"
               >
                 <Clock className="h-4 w-4" /> Recordarme en 1 hora
               </button>
@@ -338,7 +338,7 @@ export function DailyReportProvider({
                 type="button"
                 onClick={save}
                 disabled={!!busy}
-                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-card)] px-3.5 text-sm font-medium text-[var(--ink-primary)] transition-colors hover:bg-[var(--surface-hover)] disabled:opacity-50"
+                className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-card)] px-5 text-sm font-medium text-[var(--ink-primary)] transition-colors hover:bg-[var(--surface-hover)] disabled:opacity-50"
               >
                 <Save className="h-4 w-4" /> {busy === "save" ? "Guardando..." : "Guardar"}
               </button>
@@ -346,7 +346,7 @@ export function DailyReportProvider({
                 type="button"
                 onClick={send}
                 disabled={!!busy}
-                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-500)] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[var(--brand-600)] disabled:opacity-50"
+                className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[var(--brand-500)] px-6 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[var(--brand-600)] disabled:opacity-50"
               >
                 <Send className="h-4 w-4" /> {busy === "send" ? "Enviando..." : "Enviar al supervisor"}
               </button>
