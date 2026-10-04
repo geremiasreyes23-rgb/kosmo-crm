@@ -2,6 +2,7 @@
 
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { NOTIFICATION_LANGUAGES, WORK_FORMATS } from "@/lib/profileOptions";
 
 const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
 // ~1.5 MB de imagen real, ya codificada en base64 (que pesa ~33% más que el
@@ -63,12 +64,60 @@ export async function updateCoverPhotoAction(
   return { ok: true };
 }
 
+/** Usuarios activos que pueden ser supervisor (todos menos uno mismo) — se
+ * pide recién al entrar en "Editar perfil", no en cada carga de página. */
+export async function getSupervisorOptionsAction(): Promise<{ id: string; name: string }[]> {
+  const user = await requireUser();
+  const rows = await prisma.user.findMany({
+    where: { status: "ACTIVE", id: { not: user.id } },
+    select: { id: true, firstName: true, lastName: true },
+    orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+  });
+  return rows.map((r) => ({ id: r.id, name: `${r.firstName} ${r.lastName}` }));
+}
+
 export async function updateProfileAction(input: {
   jobTitle: string;
   phone: string;
   birthday: string; // "yyyy-mm-dd" o ""
+  // Opcionales: si no vienen (undefined), no se modifican.
+  department?: string;
+  city?: string;
+  notificationLanguage?: string;
+  workFormat?: string;
+  supervisorId?: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await requireUser();
+
+  const text = (v: string | undefined) => (v === undefined ? undefined : v.trim().slice(0, 100) || null);
+  if (input.notificationLanguage && !(NOTIFICATION_LANGUAGES as readonly string[]).includes(input.notificationLanguage)) {
+    return { ok: false, error: "Idioma de notificaciones inválido." };
+  }
+  if (input.workFormat && !(WORK_FORMATS as readonly string[]).includes(input.workFormat)) {
+    return { ok: false, error: "Formato de trabajo inválido." };
+  }
+  let supervisorId: string | null | undefined = undefined;
+  if (input.supervisorId !== undefined) {
+    supervisorId = input.supervisorId || null;
+    if (supervisorId) {
+      if (supervisorId === user.id) return { ok: false, error: "No puedes ser tu propio supervisor." };
+      // Evita ciclos: el supervisor elegido no puede depender (directa o
+      // indirectamente) de este usuario.
+      let cursor: string | null = supervisorId;
+      for (let i = 0; cursor && i < 20; i++) {
+        const row: { status: string; supervisorId: string | null } | null = await prisma.user.findUnique({
+          where: { id: cursor },
+          select: { status: true, supervisorId: true },
+        });
+        if (!row) return { ok: false, error: "El supervisor seleccionado ya no existe." };
+        if (i === 0 && row.status !== "ACTIVE") return { ok: false, error: "El supervisor seleccionado no está activo." };
+        if (row.supervisorId === user.id) {
+          return { ok: false, error: "Esa persona está bajo tu supervisión; no puede ser tu supervisor." };
+        }
+        cursor = row.supervisorId;
+      }
+    }
+  }
 
   let birthday: Date | null = null;
   if (input.birthday) {
@@ -85,6 +134,11 @@ export async function updateProfileAction(input: {
       jobTitle: input.jobTitle.trim() || null,
       phone: input.phone.trim() || null,
       birthday,
+      department: text(input.department),
+      city: text(input.city),
+      notificationLanguage: input.notificationLanguage === undefined ? undefined : input.notificationLanguage || null,
+      workFormat: input.workFormat === undefined ? undefined : input.workFormat || null,
+      supervisorId,
     },
   });
   await prisma.auditLog.create({

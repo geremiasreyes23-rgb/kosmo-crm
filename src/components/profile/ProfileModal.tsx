@@ -24,7 +24,15 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { AppWindowModal } from "@/components/ui/AppWindowModal";
-import { updateAvatarAction, updateCoverPhotoAction, updateProfileAction } from "@/app/(app)/profile/actions";
+import {
+  getSupervisorOptionsAction,
+  updateAvatarAction,
+  updateCoverPhotoAction,
+  updateProfileAction,
+} from "@/app/(app)/profile/actions";
+import { NOTIFICATION_LANGUAGES, WORK_FORMATS } from "@/lib/profileOptions";
+import { PersonSelect, userOptions } from "@/components/ui/PersonSelect";
+import { PersonChip } from "@/components/ui/PersonAvatar";
 import { ProfileAvatar } from "./ProfileAvatar";
 import { StatusCard } from "./StatusCard";
 import { RecognitionCard } from "./RecognitionCard";
@@ -73,12 +81,15 @@ function InfoRow({
   editing,
   input,
   value,
+  display,
 }: {
   icon: ReactNode;
   label: string;
   editing: boolean;
   input: ReactNode;
   value: string;
+  /** Vista personalizada fuera de edición (ej. foto + nombre). */
+  display?: ReactNode;
 }) {
   return (
     <div className="flex items-start gap-3 py-3.5">
@@ -89,6 +100,8 @@ function InfoRow({
         <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--ink-muted)]">{label}</p>
         {editing ? (
           input
+        ) : display ? (
+          <div className="min-w-0">{display}</div>
         ) : (
           <p
             className={`truncate text-sm font-medium ${value ? "text-[var(--ink-primary)]" : "text-[var(--ink-muted)]"}`}
@@ -132,11 +145,21 @@ export function ProfileModal({
   const [coverBusy, setCoverBusy] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
 
-  const savedValues = { phone: user.phone, jobTitle: user.jobTitle, birthday: user.birthday };
+  const savedValues = {
+    phone: user.phone,
+    jobTitle: user.jobTitle,
+    birthday: user.birthday,
+    department: user.department,
+    city: user.city,
+    notificationLanguage: user.notificationLanguage,
+    workFormat: user.workFormat,
+    supervisorId: user.supervisorId,
+  };
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(savedValues);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [supervisorOptions, setSupervisorOptions] = useState<{ id: string; name: string }[] | null>(null);
 
   const readOnlyFields = data.contactFields.filter((f) => !FIELDS_SHOWN_ELSEWHERE.has(f.label));
 
@@ -216,7 +239,96 @@ export function ProfileModal({
     setForm(savedValues);
     setFormError(null);
     setEditing(true);
+    if (!supervisorOptions) {
+      getSupervisorOptionsAction()
+        .then(setSupervisorOptions)
+        .catch(() => setSupervisorOptions([]));
+    }
   }
+
+  // Campos de la ficha que ahora se editan desde "Editar perfil".
+  const supervisorLabel =
+    supervisorOptions?.find((o) => o.id === form.supervisorId)?.name ??
+    (form.supervisorId === user.supervisorId ? user.supervisorName : "");
+  const EDITABLE_ROWS: Record<string, { value: string; input: ReactNode; display?: ReactNode }> = {
+    Departamento: {
+      value: form.department,
+      input: (
+        <input
+          value={form.department}
+          onChange={(e) => setForm({ ...form, department: e.target.value })}
+          placeholder="Ej. Ventas Medicare"
+          maxLength={100}
+          className="w-full bg-transparent text-sm font-medium text-[var(--ink-primary)] outline-none placeholder:font-normal placeholder:text-[var(--ink-muted)]"
+        />
+      ),
+    },
+    Supervisor: {
+      value: supervisorLabel,
+      display: supervisorLabel ? (
+        <PersonChip name={supervisorLabel} person={{ userId: form.supervisorId }} size={20} className="text-sm font-medium text-[var(--ink-primary)]" />
+      ) : undefined,
+      input: (
+        <div className="pt-1">
+          <PersonSelect
+            size="sm"
+            value={form.supervisorId}
+            onChange={(v) => setForm({ ...form, supervisorId: v })}
+            options={userOptions(supervisorOptions ?? [])}
+            emptyLabel="Sin supervisor"
+            placeholder={supervisorOptions ? "Selecciona..." : "Cargando..."}
+            disabled={!supervisorOptions}
+          />
+        </div>
+      ),
+    },
+    Ciudad: {
+      value: form.city,
+      input: (
+        <input
+          value={form.city}
+          onChange={(e) => setForm({ ...form, city: e.target.value })}
+          placeholder="Ej. Santo Domingo"
+          maxLength={100}
+          className="w-full bg-transparent text-sm font-medium text-[var(--ink-primary)] outline-none placeholder:font-normal placeholder:text-[var(--ink-muted)]"
+        />
+      ),
+    },
+    "Idioma de las notificaciones": {
+      value: form.notificationLanguage,
+      input: (
+        <select
+          value={form.notificationLanguage}
+          onChange={(e) => setForm({ ...form, notificationLanguage: e.target.value })}
+          className="-ml-1 w-full cursor-pointer rounded-md bg-transparent py-0.5 text-sm font-medium text-[var(--ink-primary)] outline-none hover:bg-[var(--surface-hover)]"
+        >
+          <option value="">No especificado</option>
+          {NOTIFICATION_LANGUAGES.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    "Formato de trabajo": {
+      value: form.workFormat,
+      input: (
+        <select
+          value={form.workFormat}
+          onChange={(e) => setForm({ ...form, workFormat: e.target.value })}
+          className="-ml-1 w-full cursor-pointer rounded-md bg-transparent py-0.5 text-sm font-medium text-[var(--ink-primary)] outline-none hover:bg-[var(--surface-hover)]"
+        >
+          <option value="">No especificado</option>
+          {WORK_FORMATS.map((w) => (
+            <option key={w} value={w}>
+              {w}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+  };
 
   function cancelEditing() {
     setForm(savedValues);
@@ -424,6 +536,20 @@ export function ProfileModal({
                   />
                   {readOnlyFields.map((f) => {
                     const Icon = READ_ONLY_FIELD_ICONS[f.label] ?? User;
+                    const editable = EDITABLE_ROWS[f.label];
+                    if (editable) {
+                      return (
+                        <InfoRow
+                          key={f.label}
+                          icon={<Icon className="h-4 w-4" />}
+                          label={f.label}
+                          editing={editing}
+                          value={editable.value}
+                          display={editable.display}
+                          input={editable.input}
+                        />
+                      );
+                    }
                     return (
                       <div key={f.label} className="flex items-start gap-3 py-3.5">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-sunken)] text-[var(--ink-muted)]">

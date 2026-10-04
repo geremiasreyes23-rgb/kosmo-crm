@@ -51,6 +51,12 @@ export interface ProfileViewData {
     phone: string;
     jobTitle: string;
     birthday: string;
+    department: string;
+    city: string;
+    notificationLanguage: string;
+    workFormat: string;
+    supervisorId: string;
+    supervisorName: string;
   };
 }
 
@@ -119,6 +125,7 @@ export async function getProfileViewData(sessionUser: SessionUser): Promise<Prof
         birthday: true,
         lastLoginAt: true,
         createdAt: true,
+        supervisorId: true,
         supervisor: { select: { firstName: true, lastName: true } },
       },
     }),
@@ -191,6 +198,12 @@ export async function getProfileViewData(sessionUser: SessionUser): Promise<Prof
       phone: user.phone ?? "",
       jobTitle: user.jobTitle ?? "",
       birthday: user.birthday ? user.birthday.toISOString().slice(0, 10) : "",
+      department: user.department ?? "",
+      city: user.city ?? "",
+      notificationLanguage: user.notificationLanguage ?? "",
+      workFormat: user.workFormat ?? "",
+      supervisorId: user.supervisorId ?? "",
+      supervisorName: supervisorName ?? "",
     },
   };
 }
