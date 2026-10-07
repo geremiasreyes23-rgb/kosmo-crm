@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
+import { Prisma, type Lead as LeadModel } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser, canViewAll, hasPermission, type SessionUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
@@ -23,6 +23,8 @@ import {
   type LineValues,
 } from "@/lib/leads/lineSchema";
 import { copyLeadDataToClient } from "@/lib/leads/conversion";
+import { getUserVisibility } from "@/lib/visibility-server";
+import { LINE_DEFS, noneKey, readStoredLineDetails } from "@/lib/leads/lineSchema";
 
 export interface LeadActionResult {
   ok: boolean;
@@ -85,9 +87,18 @@ async function prepareLead(
     result: { ok: false, error, fieldErrors },
   });
 
+  // Visibilidad por persona: lo que este usuario no ve no se valida ni se
+  // pisa — al editar se conserva el valor guardado (src/lib/visibility.ts).
+  const { hidden } = await getUserVisibility(user);
+  const existing = existingLeadId ? await prisma.lead.findUnique({ where: { id: existingLeadId } }) : null;
+
   const raw = payload.common ?? EMPTY_COMMON;
   const common: CommonValues = { ...EMPTY_COMMON };
   for (const key of Object.keys(EMPTY_COMMON) as (keyof CommonValues)[]) {
+    if (hidden.has(`lead.common.${key}`)) {
+      common[key] = existing ? existingCommonValue(existing, key) : "";
+      continue;
+    }
     common[key] = typeof raw[key] === "string" ? raw[key].trim().slice(0, 300) : "";
   }
   // Un vendedor sin alcance "ver todo" solo puede asignarse leads a sí mismo
@@ -100,11 +111,26 @@ async function prepareLead(
     : null;
   if (payload.lineId && !line) return fail("La línea de negocio seleccionada ya no existe.");
   const lineCode = getLineDef(line?.code)?.code ?? null;
-  const values = lineCode ? sanitizeLineValues(lineCode, payload.lineValues) : {};
+  let lineInput: Record<string, unknown> = { ...((payload.lineValues ?? {}) as Record<string, unknown>) };
+  if (lineCode) {
+    const stored =
+      existing && existing.interestedLineId === line?.id ? readStoredLineDetails(existing.lineDetails, lineCode) : null;
+    for (const section of LINE_DEFS[lineCode].sections) {
+      for (const f of section.fields) {
+        if (!hidden.has(`lead.${lineCode}.${section.id}.${f.key}`)) continue;
+        lineInput[f.key] = stored?.[f.key];
+        if (f.kind === "list") lineInput[noneKey(f.key)] = stored?.[noneKey(f.key)];
+      }
+    }
+  } else {
+    lineInput = {};
+  }
+  const values = lineCode ? sanitizeLineValues(lineCode, lineInput) : {};
 
   const allowedSensitive = allowedSensitiveKeys(lineCode, values);
   const sensitive: Record<string, string> = {};
   for (const [k, v] of Object.entries(payload.sensitive ?? {})) {
+    if (hidden.has(sensitiveVisibilityKey(lineCode, k))) continue;
     if (allowedSensitive.has(k) && typeof v === "string" && v.trim()) sensitive[k] = v.trim().slice(0, 200);
   }
   const saved = existingLeadId
@@ -123,6 +149,7 @@ async function prepareLead(
     values,
     sensitiveInputs: sensitive,
     sensitiveSaved: saved,
+    hidden,
   });
   if (!canViewAll(user) && !agentId) {
     fieldErrors["common.agentId"] = "Tu usuario no tiene un vendedor asociado. Pide a un administrador que lo vincule.";
@@ -151,6 +178,22 @@ async function prepareLead(
   }
 
   return { ok: true, common, agentId, line: line!, lineCode, values, sensitive, allowedSensitive };
+}
+
+/** Valor guardado de un campo de Cliente Común (para conservar lo oculto). */
+function existingCommonValue(row: LeadModel, key: keyof CommonValues): string {
+  if (key === "dob") return row.dob ? row.dob.toISOString().slice(0, 10) : "";
+  const v = (row as unknown as Record<string, unknown>)[key];
+  return typeof v === "string" ? v : "";
+}
+
+/** Clave de visibilidad de un dato restringido del lead. */
+function sensitiveVisibilityKey(code: LineCode | null, sensitiveKey: string): string {
+  const parts = sensitiveKey.split(".");
+  if (parts.length === 1 || !code || parts[0] !== code) return "lead.common.sensitive";
+  const fieldKey = parts[1];
+  const section = LINE_DEFS[code].sections.find((s) => s.fields.some((f) => f.key === fieldKey));
+  return section ? `lead.${code}.${section.id}.${fieldKey}` : "lead.common.sensitive";
 }
 
 function leadColumns(p: Extract<PreparedLead, { ok: true }>) {

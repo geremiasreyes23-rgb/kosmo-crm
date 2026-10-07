@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { requireUser, hasPermission } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { NAV_MODULE_KEYS } from "@/lib/navModules";
+import { getUserVisibility } from "@/lib/visibility-server";
 import { getProfileViewData } from "./profile/data";
 import { getMessengerBadgeData } from "./messages/data";
 import type { MessengerInitialData } from "./messages/data";
@@ -14,22 +14,11 @@ export const dynamic = "force-dynamic";
 export default async function AppGroupLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
 
-  // Qué módulos del Sidebar ve este usuario — Super Admin siempre ve todo
-  // (mismo criterio "bypass fijo" que hasPermission() en lib/auth.ts, para
-  // que nunca quede accidentalmente afuera de su propia Configuración);
-  // el resto lee RoleModuleVisibility, editable desde Configuración →
-  // Roles y permisos → "Visibilidad de módulos" (roles-actions.ts).
-  const visibleModuleKeys =
-    user.roleName === "Super Admin"
-      ? new Set(NAV_MODULE_KEYS)
-      : new Set(
-          (
-            await prisma.roleModuleVisibility.findMany({
-              where: { roleId: user.roleId, visible: true },
-              select: { moduleKey: true },
-            })
-          ).map((v) => v.moduleKey)
-        );
+  // Qué módulos/secciones/campos ve este usuario: su rol (Configuración →
+  // Roles y permisos → "Visibilidad de módulos") más sus excepciones
+  // personales (Configuración → Visibilidad por usuario). Super Admin
+  // siempre ve todo. Ver src/lib/visibility.ts.
+  const { hidden, visibleModuleKeys } = await getUserVisibility(user);
 
   // Jornada de fichaje abierta (si hay una) — se pasa al Header para que el
   // cronómetro arranque con el estado real guardado en base de datos, no
@@ -96,6 +85,7 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
       messengerData={messengerData}
       notificationData={notificationData}
       visibleModuleKeys={visibleModuleKeys}
+      hiddenKeys={Array.from(hidden)}
       canDailyReport={hasPermission(user, "activities", "create")}
     >
       {children}

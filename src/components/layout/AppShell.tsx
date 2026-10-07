@@ -8,6 +8,7 @@ import { NotificationProvider } from "@/components/notifications/NotificationPro
 import { ToastNotificationProvider } from "@/components/notifications/ToastNotificationProvider";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { DailyReportProvider } from "@/components/daily-report/DailyReportProvider";
+import { VisibilityProvider } from "@/components/visibility/VisibilityProvider";
 import type { SessionUser } from "@/lib/auth";
 import type { TimeEntryPayload } from "@/app/(app)/clock-actions";
 import type { ProfileViewData } from "@/app/(app)/profile/data";
@@ -23,6 +24,7 @@ export function AppShell({
   notificationData,
   visibleModuleKeys,
   canDailyReport = false,
+  hiddenKeys = [],
 }: {
   children: ReactNode;
   user: SessionUser;
@@ -37,6 +39,8 @@ export function AppShell({
   /** Puede registrar reportes diarios (activities:create) — habilita el
    * modal de Reporte diario (recordatorio + reloj de la jornada). */
   canDailyReport?: boolean;
+  /** Claves ocultas para este usuario (visibilidad por persona). */
+  hiddenKeys?: string[];
 }) {
   return (
     // ToastNotificationProvider va afuera de todo — así tanto
@@ -45,6 +49,7 @@ export function AppShell({
     // lanzar una notificación emergente con useNotifyToast() sin importar
     // en qué pantalla del CRM esté el usuario.
     <ThemeProvider initialTheme={user.themePreference}>
+    <VisibilityProvider hiddenKeys={hiddenKeys}>
     <ToastNotificationProvider>
       <MessengerProvider initialData={messengerData}>
         <NotificationProvider initialData={notificationData}>
@@ -72,6 +77,7 @@ export function AppShell({
         </NotificationProvider>
       </MessengerProvider>
     </ToastNotificationProvider>
+    </VisibilityProvider>
     </ThemeProvider>
   );
 }

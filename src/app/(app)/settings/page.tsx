@@ -12,6 +12,7 @@ import { getMailAdminOverview } from "./mail-settings-actions";
 import { getAuditLogEntries } from "./audit-data";
 import { AuditLogPanel } from "@/components/settings/AuditLogPanel";
 import { RolePermissionsPanel } from "@/components/settings/RolePermissionsPanel";
+import { UserVisibilityPanel } from "@/components/settings/UserVisibilityPanel";
 import { PipelinesPanel, type PipelineRow } from "@/components/settings/PipelinesPanel";
 import { InsuranceLinesPanel, type InsuranceLineRow } from "@/components/settings/InsuranceLinesPanel";
 import { CarriersPanel, type CarrierRow } from "@/components/settings/CarriersPanel";
@@ -55,6 +56,7 @@ export default async function SettingsPage() {
     dbCarriers,
     dbLeadSources,
     dbNotificationSettings,
+    dbVisibilityOverrides,
   ] = await Promise.all([
       prisma.role.findMany({ orderBy: { createdAt: "asc" } }),
       isManager
@@ -94,6 +96,7 @@ export default async function SettingsPage() {
       prisma.carrier.findMany({ include: { lines: true }, orderBy: { name: "asc" } }),
       prisma.leadSource.findMany({ orderBy: { name: "asc" } }),
       prisma.notificationSetting.findMany(),
+      isManager ? prisma.userVisibilityOverride.findMany() : Promise.resolve([]),
     ]);
 
   const roleOptions = dbRoles.map((r) => ({ id: r.id, name: r.name }));
@@ -270,6 +273,27 @@ export default async function SettingsPage() {
                   </p>
                 ),
               },
+              ...(isManager
+                ? [
+                    {
+                      id: "user-visibility",
+                      label: "Visibilidad por usuario",
+                      content: (
+                        <UserVisibilityPanel
+                          users={dbUsers
+                            .filter((u) => u.status === "ACTIVE")
+                            .map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, roleId: u.roleId, roleName: u.role.name }))}
+                          roleModuleVisibility={roleModuleVisibilityMap}
+                          overrides={(dbVisibilityOverrides as { userId: string; key: string; visible: boolean }[]).reduce<Record<string, Record<string, boolean>>>((acc, o) => {
+                            (acc[o.userId] ??= {})[o.key] = o.visible;
+                            return acc;
+                          }, {})}
+                          currentRoleName={currentUser.roleName}
+                        />
+                      ),
+                    },
+                  ]
+                : []),
               {
                 id: "carriers",
                 label: "Carriers",

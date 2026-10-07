@@ -23,6 +23,7 @@ export function LeadLineDetails({
   carriers,
   sensitiveByKey,
   canReveal,
+  hidden,
 }: {
   code: LineCode;
   values: LineValues;
@@ -30,13 +31,17 @@ export function LeadLineDetails({
   carriers: { id: string; name: string }[];
   sensitiveByKey: Record<string, RestrictedItem>;
   canReveal: boolean;
+  /** Visibilidad por persona: secciones/campos ocultos para quien mira. */
+  hidden?: Set<string>;
 }) {
   const def = LINE_DEFS[code];
   return (
     <div className="space-y-5">
-      {def.sections.map((section) => {
+      {def.sections.filter((section) => !hidden?.has(`lead.${code}.${section.id}`)).map((section) => {
         const restricted: RestrictedItem[] = [];
-        const rows = section.fields.filter((f) => isFieldVisible(f, values));
+        const rows = section.fields.filter(
+          (f) => isFieldVisible(f, values) && !hidden?.has(`lead.${code}.${section.id}.${f.key}`)
+        );
         return (
           <div key={section.id}>
             <h4 className="mb-2 text-xs font-semibold uppercase text-[var(--ink-muted)]">{section.title}</h4>

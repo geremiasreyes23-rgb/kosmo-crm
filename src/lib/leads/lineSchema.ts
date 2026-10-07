@@ -585,6 +585,32 @@ const FAMILY_HERITAGE: LineDef = {
 
 export const LINE_DEFS: Record<LineCode, LineDef> = { MEDICARE, OBAMACARE, FAMILY_HERITAGE };
 
+/**
+ * Campos de ENVÍO (submisión a la aseguradora) por línea: los que llena
+ * quien somete la solicitud desde el panel "Envíos". Siguen siendo campos
+ * normales de la línea (viven en Lead.lineDetails); esta lista solo dice
+ * cuáles muestra y exige el panel. `section` = id de la sección en LINE_DEFS.
+ */
+export const SUBMISSION_FIELDS: Record<LineCode, { section: string; keys: string[] }[]> = {
+  MEDICARE: [{ section: "compliance", keys: ["soaDate", "soaMethod", "callRecording", "effectiveDate", "confirmationNumber"] }],
+  OBAMACARE: [{ section: "plan", keys: ["marketplaceAppId", "consentDate", "effectiveDate"] }],
+  FAMILY_HERITAGE: [{ section: "plan", keys: ["policyNumber", "effectiveDate"] }],
+};
+
+/** FieldDef + sección de cada campo de envío de una línea. */
+export function submissionFieldDefs(code: LineCode): { sectionId: string; field: FieldDef }[] {
+  const out: { sectionId: string; field: FieldDef }[] = [];
+  for (const group of SUBMISSION_FIELDS[code]) {
+    const section = LINE_DEFS[code].sections.find((s) => s.id === group.section);
+    if (!section) continue;
+    for (const key of group.keys) {
+      const field = section.fields.find((f) => f.key === key);
+      if (field) out.push({ sectionId: section.id, field });
+    }
+  }
+  return out;
+}
+
 export function getLineDef(code: string | null | undefined): LineDef | null {
   if (!code) return null;
   return (LINE_DEFS as Record<string, LineDef>)[code] ?? null;
@@ -872,6 +898,9 @@ export interface ValidateLeadInput {
   sensitiveInputs: Record<string, string>;
   /** Claves restringidas que ya están guardadas (en edición). */
   sensitiveSaved: Set<string> | string[];
+  /** Visibilidad por persona (src/lib/visibility.ts): lo oculto para quien
+   * llena el formulario no se valida ni se exige. */
+  hidden?: Set<string>;
 }
 
 export function validateLead(input: ValidateLeadInput, now = new Date()): FieldErrors {
@@ -879,10 +908,12 @@ export function validateLead(input: ValidateLeadInput, now = new Date()): FieldE
   const today = todayYmd(now);
   const saved = input.sensitiveSaved instanceof Set ? input.sensitiveSaved : new Set(input.sensitiveSaved);
   const hasSensitive = (key: string) => !!input.sensitiveInputs[key]?.trim() || saved.has(key);
+  const hidden = input.hidden ?? new Set<string>();
 
   // ── Cliente Común ──
   const c = input.common;
   for (const key of COMMON_REQUIRED) {
+    if (hidden.has(`lead.common.${key}`)) continue;
     if (!String(c[key] ?? "").trim()) errors[`common.${key}`] = "Campo obligatorio.";
   }
   if (c.dob && !errors["common.dob"]) {
@@ -893,6 +924,7 @@ export function validateLead(input: ValidateLeadInput, now = new Date()): FieldE
   if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email.trim())) errors["common.email"] = "Correo inválido.";
   if (c.zipCode && !/^\d{5}(-\d{4})?$/.test(c.zipCode.trim())) errors["common.zipCode"] = "Código postal de 5 dígitos.";
   for (const s of COMMON_SENSITIVE) {
+    if (hidden.has("lead.common.sensitive")) break;
     const typed = input.sensitiveInputs[s.key]?.trim();
     if (typed) {
       const err = validateSensitiveFormat(s.format, typed);
@@ -914,6 +946,7 @@ export function validateLead(input: ValidateLeadInput, now = new Date()): FieldE
   for (const section of LINE_DEFS[code].sections) {
     for (const f of section.fields) {
       if (!isFieldVisible(f, values)) continue;
+      if (hidden.has(`lead.${code}.${section.id}.${f.key}`)) continue;
       const path = `line.${f.key}`;
       switch (f.kind) {
         case "turning65":
@@ -988,13 +1021,15 @@ export function sectionProgress(
   code: LineCode,
   section: SectionDef,
   values: LineValues,
-  errors: FieldErrors
+  errors: FieldErrors,
+  hidden?: Set<string>
 ): { done: number; total: number; hasErrors: boolean } {
   let done = 0;
   let total = 0;
   let hasErrors = false;
   for (const f of section.fields) {
     if (!isFieldVisible(f, values) || f.kind === "computed-age" || f.kind === "turning65") continue;
+    if (hidden?.has(`lead.${code}.${section.id}.${f.key}`)) continue;
     total++;
     const path = `line.${f.key}`;
     const ownErrors = Object.keys(errors).some(

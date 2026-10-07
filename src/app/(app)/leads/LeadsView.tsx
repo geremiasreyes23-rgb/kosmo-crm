@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Field";
 import { KanbanBoard } from "@/components/ui/Kanban";
 import { LeadFormDrawer } from "@/components/leads/form/LeadFormDrawer";
+import { useHiddenKeys } from "@/components/visibility/VisibilityProvider";
 import { PersonSelect, agentOptions } from "@/components/ui/PersonSelect";
 import { PersonAvatar, PersonChip } from "@/components/ui/PersonAvatar";
 import { turning65 } from "@/lib/leads/lineSchema";
@@ -47,6 +48,9 @@ export function LeadsView({
   currentAgentId: string | null;
 }) {
   const router = useRouter();
+  // Visibilidad por persona: columnas/datos ocultos para este usuario.
+  const hiddenKeys = useHiddenKeys();
+  const see = (k: string) => !hiddenKeys.has(`lead.common.${k}`);
 
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   useEffect(() => setLeads(initialLeads), [initialLeads]);
@@ -196,7 +200,7 @@ export function LeadsView({
                   </p>
                 </div>
               </div>
-              {lead.phone && (
+              {see("phone") && lead.phone && (
                 <p className="mt-2 flex items-center gap-1.5 text-xs text-[var(--ink-secondary)]">
                   <Phone className="h-3 w-3 shrink-0" /> {lead.phone}
                 </p>
@@ -208,8 +212,12 @@ export function LeadsView({
               )}
               <div className="mt-2.5 flex items-center justify-between border-t border-[var(--border-grid)] pt-2">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <PersonAvatar name={lead.agentName || "?"} person={{ agentId: lead.agentId }} size={20} />
-                  <span className="truncate text-xs text-[var(--ink-muted)]">{lead.agentName}</span>
+                  {see("agentId") && (
+                    <>
+                      <PersonAvatar name={lead.agentName || "?"} person={{ agentId: lead.agentId }} size={20} />
+                      <span className="truncate text-xs text-[var(--ink-muted)]">{lead.agentName}</span>
+                    </>
+                  )}
                 </div>
                 <span className="shrink-0 text-xs text-[var(--ink-muted)]">{formatDate(lead.createdAt)}</span>
               </div>
@@ -222,10 +230,10 @@ export function LeadsView({
             <THead>
               <Tr>
                 <Th>Lead</Th>
-                <Th>Contacto</Th>
-                <Th>Origen</Th>
+                {(see("phone") || see("email")) && <Th>Contacto</Th>}
+                {see("sourceId") && <Th>Origen</Th>}
                 <Th>Línea de negocio</Th>
-                <Th>Vendedor</Th>
+                {see("agentId") && <Th>Vendedor</Th>}
                 <Th>Etapa</Th>
                 <Th>Creado</Th>
                 <Th>Próximo seguimiento</Th>
@@ -239,11 +247,13 @@ export function LeadsView({
                       {lead.firstName} {lead.lastName}
                     </Link>
                   </Td>
-                  <Td>
-                    <p>{lead.phone}</p>
-                    <p className="text-xs text-[var(--ink-muted)]">{lead.email}</p>
-                  </Td>
-                  <Td>{lead.source}</Td>
+                  {(see("phone") || see("email")) && (
+                    <Td>
+                      {see("phone") && <p>{lead.phone}</p>}
+                      {see("email") && <p className="text-xs text-[var(--ink-muted)]">{lead.email}</p>}
+                    </Td>
+                  )}
+                  {see("sourceId") && <Td>{lead.source}</Td>}
                   <Td>
                     {lead.productLine ? (
                       <Badge status="neutral">{lead.productLine}</Badge>
@@ -251,9 +261,11 @@ export function LeadsView({
                       <span className="text-xs text-[var(--ink-muted)]">—</span>
                     )}
                   </Td>
-                  <Td>
-                    <PersonChip name={lead.agentName} person={{ agentId: lead.agentId }} />
-                  </Td>
+                  {see("agentId") && (
+                    <Td>
+                      <PersonChip name={lead.agentName} person={{ agentId: lead.agentId }} />
+                    </Td>
+                  )}
                   <Td>
                     <Badge status="info">{stageName(stages, lead.stageId)}</Badge>
                   </Td>

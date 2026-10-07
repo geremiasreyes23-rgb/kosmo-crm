@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Users, UserCheck, Handshake, ShieldCheck, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useHiddenKeys } from "@/components/visibility/VisibilityProvider";
 
 type CrmTab = {
   href: string;
@@ -28,6 +29,8 @@ const CRM_TABS: CrmTab[] = [
  */
 export function CrmSubNav() {
   const pathname = usePathname();
+  const hidden = useHiddenKeys();
+  const tabs = CRM_TABS.filter((t) => !hidden.has(`crm:${t.href}`));
 
   return (
     <div className="mb-5 flex flex-wrap items-center gap-3 border-b border-[var(--border-hairline)] pb-3">
@@ -35,7 +38,7 @@ export function CrmSubNav() {
         CRM
       </span>
       <div className="flex flex-wrap items-center gap-1">
-        {CRM_TABS.map(({ href, label, icon: Icon, color }) => {
+        {tabs.map(({ href, label, icon: Icon, color }) => {
           const active = pathname === href || pathname?.startsWith(href + "/");
           return (
             <Link

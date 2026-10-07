@@ -82,6 +82,8 @@ model User {
   dailyReports          DailyReport[] @relation("DailyReportAuthor")
   dailyReportsReviewed  DailyReport[] @relation("DailyReportReviewer")
   dailyReportDrafts     DailyReportDraft[]
+  visibilityOverrides   UserVisibilityOverride[]
+  leadsSubmitted        Lead[]   @relation("LeadSubmittedBy")
   appointments          Appointment[]
   notifications         Notification[]
   auditLogs             AuditLog[]
@@ -394,6 +396,17 @@ model Lead {
   customFieldValues CustomFieldValue[]
   sensitiveFields   SensitiveField[]
 
+  // Envíos (submisiones): el lead se manda a la cola del panel "Envíos" y
+  // quien somete la solicitud a la aseguradora registra el resultado.
+  // null = todavía no se envió a la cola.
+  submissionStatus     SubmissionStatus?
+  submissionRequestedAt DateTime?
+  submissionRequestedById String?
+  submittedAt          DateTime?
+  submittedById        String?
+  submittedBy          User?     @relation("LeadSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  submissionNotes      String?
+
   // Datos específicos de la línea de negocio seleccionada (interestedLine).
   // Estructura: { line: "MEDICARE" | "OBAMACARE" | "FAMILY_HERITAGE", values: {...} }
   // — el contrato de campos vive en src/lib/leads/lineSchema.ts, que lo
@@ -403,6 +416,7 @@ model Lead {
   // cifrados en SensitiveField (leadId).
   lineDetails       Json?
 
+  @@index([submissionStatus])
   @@index([stageId])
   @@index([agentId])
 }
@@ -895,6 +909,25 @@ model DailyReport {
 // uno por usuario y día. Se borra cuando el reporte se envía al supervisor.
 // `day` es la fecha local del usuario (YYYY-MM-DD), para que "hoy" respete
 // su zona horaria y no la del servidor.
+// Visibilidad por persona (Configuración → Visibilidad por usuario): solo
+// las EXCEPCIONES respecto de su rol. `key` es una clave del catálogo de
+// src/lib/visibility.ts (ej. "module:/submissions", "lead.MEDICARE.compliance").
+model UserVisibilityOverride {
+  userId  String
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key     String
+  visible Boolean
+
+  @@id([userId, key])
+}
+
+enum SubmissionStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
 model DailyReportDraft {
   id        String   @id @default(cuid())
   userId    String

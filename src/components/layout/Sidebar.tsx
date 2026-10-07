@@ -8,6 +8,7 @@ import { KosmoTextMark } from "@/components/brand/KosmoLogo";
 import { HolographicSphere } from "@/components/brand/HolographicSphere";
 import { CHROME_GRADIENT_STYLE } from "./chromeGradient";
 import { useMessenger } from "@/components/messenger/MessengerProvider";
+import { useHiddenKeys } from "@/components/visibility/VisibilityProvider";
 import {
   LayoutDashboard,
   Users,
@@ -23,6 +24,7 @@ import {
   Mail,
   FolderOpen,
   Newspaper,
+  Send,
   type LucideIcon,
 } from "lucide-react";
 
@@ -50,6 +52,7 @@ const navItems: NavItem[] = [
   { href: "/messages", label: "Mensajes", icon: MessageCircle, color: "#20b6ac", badge: 0 },
   { href: "/mail", label: "Correo", icon: Mail, color: "#5b6bd6", badge: 0 },
   { href: "/leads", label: "CRM", icon: Users, color: "#eb6834", badge: 0, matchRoutes: CRM_ROUTES },
+  { href: "/submissions", label: "Envíos", icon: Send, color: "#c2185b", badge: 0 },
   { href: "/activities", label: "Actividades", icon: ListChecks, color: "#e87ba4", badge: 0 },
   { href: "/tasks", label: "Tareas", icon: CheckSquare, color: "#3987e5", badge: 0 },
   { href: "/calendar", label: "Calendario", icon: CalendarDays, color: "#1baf7a", badge: 0 },
@@ -73,6 +76,9 @@ export function Sidebar({ visibleModuleKeys }: { visibleModuleKeys: Set<string> 
   // permisos → "Visibilidad de módulos"), calculado en
   // src/app/(app)/layout.tsx y pasado hasta acá.
   const visibleNavItems = navItems.filter((item) => visibleModuleKeys.has(item.href));
+  // El acceso "CRM" lleva a la primera pestaña que la persona sí ve.
+  const hidden = useHiddenKeys();
+  const crmHref = CRM_ROUTES.find((r) => !hidden.has(`crm:${r}`)) ?? "/leads";
   const [collapsed, setCollapsed] = useState(false);
   const [hovering, setHovering] = useState(false);
 
@@ -154,7 +160,7 @@ export function Sidebar({ visibleModuleKeys }: { visibleModuleKeys: Set<string> 
             return (
               <Link
                 key={href}
-                href={href}
+                href={href === "/leads" ? crmHref : href}
                 title={expanded ? undefined : label}
                 className={cn(
                   "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",

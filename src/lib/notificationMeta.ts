@@ -18,6 +18,7 @@ import {
   Newspaper,
   MessageSquare,
   ThumbsUp,
+  Send,
   type LucideIcon,
 } from "lucide-react";
 import type { NotificationVM } from "@/types";
@@ -63,6 +64,8 @@ export const NOTIFICATION_TYPE_META: Record<string, NotificationTypeMeta> = {
   daily_report_submitted: { icon: ListChecks, accent: "#e87ba4" },
   daily_report_reviewed: { icon: ClipboardCheck, accent: "#e87ba4" },
   documentation_pending: { icon: FileClock, accent: "#eda100" },
+  submission_requested: { icon: Send, accent: "#c2185b" },
+  submission_updated: { icon: Send, accent: "#c2185b" },
   // Feed de Actividades
   feed_post: { icon: Newspaper, accent: "#8b5cf6" },
   feed_reply: { icon: MessageSquare, accent: "#8b5cf6" },
@@ -88,6 +91,8 @@ export function notificationHref(n: Pick<NotificationVM, "relatedEntityType" | "
       return "/calendar";
     case "Client":
       return n.relatedEntityId ? `/clients/${n.relatedEntityId}` : "/clients";
+    case "LeadSubmission":
+      return "/submissions";
     case "Lead":
       return n.relatedEntityId ? `/leads/${n.relatedEntityId}` : "/leads";
     case "Policy":

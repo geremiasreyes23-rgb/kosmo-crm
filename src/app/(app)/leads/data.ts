@@ -71,6 +71,7 @@ function mapLead(row: LeadRow): LeadVM {
     leadCode: formatLeadCode(row.leadNumber),
     agentId: row.agentId ?? undefined,
     aorId: row.aorId ?? undefined,
+    submissionStatus: row.submissionStatus ?? undefined,
     dob: row.dob ? row.dob.toISOString().slice(0, 10) : undefined,
     address: row.address ?? undefined,
     zipCode: row.zipCode ?? undefined,

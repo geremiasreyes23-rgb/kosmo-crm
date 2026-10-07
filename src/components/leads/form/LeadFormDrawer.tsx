@@ -46,6 +46,7 @@ import {
 } from "@/lib/leads/lineSchema";
 import { LeadField, SensitiveInput, inputClass } from "./primitives";
 import { LineFields, RestrictedLabel, Turning65Alert } from "./LineFields";
+import { useHiddenKeys } from "@/components/visibility/VisibilityProvider";
 
 const MAX_DOCUMENT_SIZE_MB = 8;
 
@@ -163,6 +164,9 @@ export interface LeadFormDrawerProps {
 export function LeadFormDrawer(props: LeadFormDrawerProps) {
   const { open, onClose, mode, formOptions, stages = [], initial, canAssignOthers, currentUserName } = props;
   const router = useRouter();
+  const hidden = useHiddenKeys();
+  const show = (k: keyof CommonValues | "sensitive" | "documents" | "notes") => !hidden.has(`lead.common.${k}`);
+  const requiredCommon = COMMON_REQUIRED.filter((k) => show(k));
 
   const [common, setCommon] = useState<CommonValues>(EMPTY_COMMON);
   const [lineId, setLineId] = useState("");
@@ -261,10 +265,10 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
   // Progreso por sección (de la línea activa).
   const sectionStats = useMemo(() => {
     if (!lineDef || !lineCode) return [];
-    return lineDef.sections.map((s) => ({ id: s.id, ...sectionProgress(lineCode, s, values, errors) }));
-  }, [lineDef, lineCode, values, errors]);
+    return lineDef.sections.map((s) => ({ id: s.id, ...sectionProgress(lineCode, s, values, errors, hidden) }));
+  }, [lineDef, lineCode, values, errors, hidden]);
 
-  const commonDone = COMMON_REQUIRED.filter((k) => String(common[k] ?? "").trim() && !errors[`common.${k}`]).length;
+  const commonDone = requiredCommon.filter((k) => String(common[k] ?? "").trim() && !errors[`common.${k}`]).length;
   const lineTotals = sectionStats.reduce(
     (acc, s) => ({ done: acc.done + s.done, total: acc.total + s.total }),
     { done: 0, total: 0 }
@@ -289,7 +293,7 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
     if (lineDef && lineCode) {
       const opened: Record<string, boolean> = {};
       for (const s of lineDef.sections) {
-        if (sectionProgress(lineCode, s, values, errs).hasErrors) opened[s.id] = true;
+        if (sectionProgress(lineCode, s, values, errs, hidden).hasErrors) opened[s.id] = true;
       }
       setOpenSections((prev) => ({ ...prev, ...opened }));
     }
@@ -313,6 +317,7 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
       values,
       sensitiveInputs,
       sensitiveSaved: Object.keys(savedMasks),
+      hidden,
     });
     if (Object.keys(clientErrors).length) {
       setErrors(clientErrors);
@@ -375,7 +380,8 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
   const err = (k: keyof CommonValues) => errors[`common.${k}`];
   const req = (k: keyof CommonValues) => COMMON_REQUIRED.includes(k);
 
-  const textInput = (k: keyof CommonValues, opts: { type?: string; placeholder?: string; inputMode?: "numeric" | "tel" | "email" } = {}) => (
+  // Visibilidad por persona: campos ocultos para este usuario.
+  const textInput = (k: keyof CommonValues, opts: { type?: string; placeholder?: string; inputMode?: "numeric" | "tel" | "email" } = {}) => !show(k) ? null : (
     <LeadField label={COMMON_LABELS[k]} required={req(k)} error={err(k)} htmlFor={`common-${k}`}>
       <input
         id={`common-${k}`}
@@ -404,7 +410,7 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
         <div className="flex w-full items-center justify-between gap-3">
           <div className="hidden items-center gap-2 text-xs text-[var(--ink-muted)] sm:flex">
             <span>
-              Cliente <strong className="text-[var(--ink-secondary)]">{commonDone}/{COMMON_REQUIRED.length}</strong>
+              Cliente <strong className="text-[var(--ink-secondary)]">{commonDone}/{requiredCommon.length}</strong>
             </span>
             {lineDef && (
               <span>
@@ -439,7 +445,7 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
           step={1}
           title="Información del cliente"
           subtitle="Datos comunes a todos los leads, sin importar la línea de negocio."
-          right={<ProgressPill done={commonDone} total={COMMON_REQUIRED.length} hasErrors={Object.keys(errors).some((k) => k.startsWith("common.")) || restrictedErrors} />}
+          right={<ProgressPill done={commonDone} total={requiredCommon.length} hasErrors={Object.keys(errors).some((k) => k.startsWith("common.")) || restrictedErrors} />}
         >
           <div className="grid grid-cols-2 gap-3 rounded-lg bg-[var(--surface-sunken)] px-3 py-2.5 text-sm">
             <div>
@@ -457,7 +463,8 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
             <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
               {textInput("firstName")}
               {textInput("lastName")}
-              <LeadField
+              {show("dob") && (
+<LeadField
                 label={COMMON_LABELS.dob}
                 required
                 error={err("dob")}
@@ -473,7 +480,9 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
                   className={inputClass(err("dob"))}
                 />
               </LeadField>
-              <LeadField label={COMMON_LABELS.preferredLanguage} required error={err("preferredLanguage")} htmlFor="common-lang">
+)}
+              {show("preferredLanguage") && (
+<LeadField label={COMMON_LABELS.preferredLanguage} required error={err("preferredLanguage")} htmlFor="common-lang">
                 <Select id="common-lang" value={common.preferredLanguage} onChange={(e) => setCommonField("preferredLanguage", e.target.value)} className={err("preferredLanguage") ? "border-[var(--status-critical)]" : undefined}>
                   <option value="">Selecciona...</option>
                   {LANGUAGES.map((l) => (
@@ -483,6 +492,7 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
                   ))}
                 </Select>
               </LeadField>
+)}
             </div>
           </div>
 
@@ -491,10 +501,13 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
             <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
               {textInput("phone", { type: "tel", placeholder: "(305) 555-0100", inputMode: "tel" })}
               {textInput("email", { type: "email", placeholder: "nombre@correo.com", inputMode: "email" })}
-              <div className="sm:col-span-2">{textInput("address", { placeholder: "Calle, número, apto." })}</div>
+              {show("address") && (
+<div className="sm:col-span-2">{textInput("address", { placeholder: "Calle, número, apto." })}</div>
+)}
               {textInput("zipCode", { placeholder: "33101", inputMode: "numeric" })}
               {textInput("county", { placeholder: "Miami-Dade" })}
-              <LeadField label={COMMON_LABELS.state} required error={err("state")} htmlFor="common-state">
+              {show("state") && (
+<LeadField label={COMMON_LABELS.state} required error={err("state")} htmlFor="common-state">
                 <Select id="common-state" value={common.state} onChange={(e) => setCommonField("state", e.target.value)} className={err("state") ? "border-[var(--status-critical)]" : undefined}>
                   <option value="">Selecciona...</option>
                   {US_STATES.map((s) => (
@@ -504,13 +517,15 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
                   ))}
                 </Select>
               </LeadField>
+)}
             </div>
           </div>
 
           <div>
             <SubHeading icon={<Briefcase className="h-3.5 w-3.5" />}>Gestión comercial</SubHeading>
             <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
-              <LeadField label={COMMON_LABELS.sourceId} required error={err("sourceId")} full>
+              {show("sourceId") && (
+<LeadField label={COMMON_LABELS.sourceId} required error={err("sourceId")} full>
                 <div className="flex flex-wrap gap-1.5">
                   {formOptions.sources.map((s) => (
                     <button
@@ -532,7 +547,9 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
                   ))}
                 </div>
               </LeadField>
-              <LeadField label={COMMON_LABELS.agentId} required error={err("agentId")} htmlFor="common-agent">
+)}
+              {show("agentId") && (
+<LeadField label={COMMON_LABELS.agentId} required error={err("agentId")} htmlFor="common-agent">
                 {canAssignOthers ? (
                   <PersonSelect
                     id="common-agent"
@@ -548,7 +565,9 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
                   </div>
                 )}
               </LeadField>
-              <LeadField label={COMMON_LABELS.aorId} error={err("aorId")} htmlFor="common-aor">
+)}
+              {show("aorId") && (
+<LeadField label={COMMON_LABELS.aorId} error={err("aorId")} htmlFor="common-aor">
                 <PersonSelect
                   id="common-aor"
                   value={common.aorId}
@@ -557,6 +576,7 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
                   emptyLabel="Sin AOR"
                 />
               </LeadField>
+)}
               {mode === "create" && (
                 <LeadField label="Etapa inicial" htmlFor="common-stage">
                   <Select id="common-stage" value={stageId} onChange={(e) => setStageId(e.target.value)}>
@@ -572,7 +592,8 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
           </div>
 
           {/* Información restringida — plegada por defecto */}
-          <div className="rounded-lg border border-[var(--status-serious-bg)] bg-[var(--status-serious-bg)]/30">
+          {show("sensitive") && (
+<div className="rounded-lg border border-[var(--status-serious-bg)] bg-[var(--status-serious-bg)]/30">
             <button
               type="button"
               onClick={() => setRestrictedOpen((v) => !v)}
@@ -619,11 +640,13 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
               </div>
             )}
           </div>
+)}
 
           <div>
             <SubHeading icon={<FileText className="h-3.5 w-3.5" />}>Documentos y notas</SubHeading>
             <div className="space-y-3">
-              <LeadField label="Documentos adjuntos" hint={`Hasta ${MAX_DOCUMENT_SIZE_MB}MB por archivo. Se adjuntan al guardar.`}>
+              {show("documents") && (
+<LeadField label="Documentos adjuntos" hint={`Hasta ${MAX_DOCUMENT_SIZE_MB}MB por archivo. Se adjuntan al guardar.`}>
                 <input ref={fileRef} type="file" multiple className="hidden" onChange={(e) => addFiles(e.target.files)} />
                 <div className="space-y-1.5">
                   {files.map((f, i) => (
@@ -643,9 +666,12 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
                   </Button>
                 </div>
               </LeadField>
-              <LeadField label={mode === "edit" ? "Agregar nota" : "Notas"} htmlFor="common-note" hint={mode === "edit" ? "Se agrega al historial de la pestaña Notas." : undefined}>
+)}
+              {show("notes") && (
+<LeadField label={mode === "edit" ? "Agregar nota" : "Notas"} htmlFor="common-note" hint={mode === "edit" ? "Se agrega al historial de la pestaña Notas." : undefined}>
                 <Textarea id="common-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Detalles adicionales del lead..." />
               </LeadField>
+)}
             </div>
           </div>
 
@@ -727,7 +753,7 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
             {lineCode === "MEDICARE" && <Turning65Alert dob={common.dob} compact />}
             {lineDef && lineCode ? (
               <div className="space-y-2">
-                {lineDef.sections.map((section, idx) => {
+                {lineDef.sections.filter((section) => !hidden.has(`lead.${lineCode}.${section.id}`)).map((section, idx) => {
                   const stats = sectionStats.find((s) => s.id === section.id)!;
                   const isOpen = openSections[section.id] ?? idx === 0;
                   return (
@@ -761,7 +787,7 @@ export function LeadFormDrawer(props: LeadFormDrawerProps) {
                         <div className="border-t border-[var(--border-hairline)] px-3 py-3.5">
                           {section.description && <p className="mb-3 text-xs text-[var(--ink-muted)]">{section.description}</p>}
                           <LineFields
-                            fields={section.fields}
+                            fields={section.fields.filter((f) => !hidden.has(`lead.${lineCode}.${section.id}.${f.key}`))}
                             ctx={{
                               code: lineCode,
                               values,

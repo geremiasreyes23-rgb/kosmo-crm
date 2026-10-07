@@ -50,6 +50,8 @@ export interface Lead {
   leadCode?: string;
   agentId?: string;
   aorId?: string;
+  /** Estado en el panel Envíos (undefined = no se envió a la cola). */
+  submissionStatus?: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
   dob?: string;
   address?: string;
   zipCode?: string;

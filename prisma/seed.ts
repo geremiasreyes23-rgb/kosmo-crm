@@ -10,7 +10,7 @@
 import { PrismaClient, CustomFieldType, RecognitionType } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
-import { NAV_MODULE_KEYS } from "../src/lib/navModules";
+import { NAV_MODULE_KEYS, NAV_MODULES_HIDDEN_BY_DEFAULT } from "../src/lib/navModules";
 import { NOTIFICATION_SETTINGS } from "../src/lib/notificationSettings";
 
 const prisma = new PrismaClient();
@@ -181,7 +181,7 @@ async function main() {
       await prisma.roleModuleVisibility.upsert({
         where: { roleId_moduleKey: { roleId: role.id, moduleKey } },
         update: {},
-        create: { roleId: role.id, moduleKey, visible: true },
+        create: { roleId: role.id, moduleKey, visible: !NAV_MODULES_HIDDEN_BY_DEFAULT.includes(moduleKey) },
       });
     }
   }

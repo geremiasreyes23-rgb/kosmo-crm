@@ -19,6 +19,7 @@ export const NAV_MODULES: NavModuleDef[] = [
   { key: "/messages", label: "Mensajes" },
   { key: "/mail", label: "Correo interno" },
   { key: "/leads", label: "CRM (Leads, Clientes, Ventas, Pólizas)" },
+  { key: "/submissions", label: "Envíos (submisiones)" },
   { key: "/activities", label: "Actividades" },
   { key: "/tasks", label: "Tareas" },
   { key: "/calendar", label: "Calendario" },
@@ -29,3 +30,7 @@ export const NAV_MODULES: NavModuleDef[] = [
 ];
 
 export const NAV_MODULE_KEYS: string[] = NAV_MODULES.map((m) => m.key);
+
+/** Módulos que se siembran OCULTOS para todos los roles: solo los ve quien
+ * el administrador habilite (por rol o por persona). */
+export const NAV_MODULES_HIDDEN_BY_DEFAULT: string[] = ["/submissions"];

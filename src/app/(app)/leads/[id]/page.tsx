@@ -7,6 +7,8 @@ import { Tabs } from "@/components/ui/Tabs";
 import { requireUser, hasPermission, canViewAll } from "@/lib/auth";
 import { getLeadForUser, getLeadPipelineStages, getLeadEditData, getLeadFormOptions } from "../data";
 import { EditLeadButton } from "@/components/leads/EditLeadButton";
+import { SubmissionRequestButton } from "@/components/leads/SubmissionRequestButton";
+import { getUserVisibility } from "@/lib/visibility-server";
 import { PersonAvatar, PersonChip } from "@/components/ui/PersonAvatar";
 import { LeadLineDetails } from "@/components/leads/LeadLineDetails";
 import { LeadRestrictedPanel } from "@/components/leads/LeadRestrictedPanel";
@@ -31,6 +33,9 @@ export default async function LeadDetailPage({
 }) {
   const { id } = await params;
   const user = await requireUser();
+  // Visibilidad por persona (src/lib/visibility.ts).
+  const { hidden } = await getUserVisibility(user);
+  const show = (k: string) => !hidden.has(`lead.common.${k}`);
   const [lead, stages, leadActivities, leadTasks, leadNotes, leadDocuments, editData, formOptions] = await Promise.all([
     getLeadForUser(id, user),
     getLeadPipelineStages(),
@@ -75,6 +80,9 @@ export default async function LeadDetailPage({
               currentAgentId={user.agentId}
             />
           )}
+          {canEditLead && lineDef && (!lead.submissionStatus || lead.submissionStatus === "REJECTED") && (
+            <SubmissionRequestButton leadId={lead.id} resend={lead.submissionStatus === "REJECTED"} />
+          )}
           {lead.convertedClientId ? (
             <Link href={`/clients/${lead.convertedClientId}`}>
               <Button size="sm" variant="secondary">
@@ -91,6 +99,22 @@ export default async function LeadDetailPage({
       <div className="mb-4 flex flex-wrap gap-2">
         <Badge status="info">{stage?.name}</Badge>
         {lead.productLine && <Badge status="good">{lead.productLine}</Badge>}
+        {lead.submissionStatus && (
+          <Badge
+            status={
+              lead.submissionStatus === "APPROVED"
+                ? "good"
+                : lead.submissionStatus === "REJECTED"
+                  ? "critical"
+                  : lead.submissionStatus === "SUBMITTED"
+                    ? "info"
+                    : "warning"
+            }
+          >
+            Envío:{" "}
+            {{ PENDING: "pendiente", SUBMITTED: "sometido", APPROVED: "aprobado", REJECTED: "rechazado" }[lead.submissionStatus]}
+          </Badge>
+        )}
         {t65 && t65.status === "soon" && (
           <Badge status="warning">
             <Cake className="mr-1 h-3 w-3" /> {t65.message}
@@ -122,26 +146,28 @@ export default async function LeadDetailPage({
                             <Info label="Fecha de creación" value={formatDate(lead.createdAt)} />
                             <Info label="Nombre" value={lead.firstName} />
                             <Info label="Apellido" value={lead.lastName} />
-                            <Info label="Fecha de nacimiento" value={dobLabel} />
-                            <Info label="Idioma preferido" value={lead.preferredLanguage} />
-                            <Info label="Teléfono" value={lead.phone} />
-                            <Info label="Correo electrónico" value={lead.email} />
-                            <Info label="Dirección" value={lead.address} />
-                            <Info label="Código postal" value={lead.zipCode} />
-                            <Info label="Condado" value={lead.county} />
-                            <Info label="Estado" value={US_STATES.find((s) => s.value === lead.state)?.label ?? lead.state} />
-                            <Info label="Origen del lead" value={lead.source} />
-                            <Info label="Vendedor" value={<PersonChip name={lead.agentName} person={{ agentId: lead.agentId }} />} />
-                            <Info label="AOR" value={lead.aorName ? <PersonChip name={lead.aorName} person={{ agentId: lead.aorId }} /> : undefined} />
+                            {show("dob") && <Info label="Fecha de nacimiento" value={dobLabel} />}
+                            {show("preferredLanguage") && <Info label="Idioma preferido" value={lead.preferredLanguage} />}
+                            {show("phone") && <Info label="Teléfono" value={lead.phone} />}
+                            {show("email") && <Info label="Correo electrónico" value={lead.email} />}
+                            {show("address") && <Info label="Dirección" value={lead.address} />}
+                            {show("zipCode") && <Info label="Código postal" value={lead.zipCode} />}
+                            {show("county") && <Info label="Condado" value={lead.county} />}
+                            {show("state") && <Info label="Estado" value={US_STATES.find((s) => s.value === lead.state)?.label ?? lead.state} />}
+                            {show("sourceId") && <Info label="Origen del lead" value={lead.source} />}
+                            {show("agentId") && <Info label="Vendedor" value={<PersonChip name={lead.agentName} person={{ agentId: lead.agentId }} />} />}
+                            {show("aorId") && <Info label="AOR" value={lead.aorName ? <PersonChip name={lead.aorName} person={{ agentId: lead.aorId }} /> : undefined} />}
                             <Info label="Último contacto" value={lead.lastContactAt ? formatDate(lead.lastContactAt) : "—"} />
                           </dl>
                           <div className="mt-4">
-                            <LeadRestrictedPanel
+                            {show("sensitive") && (
+<LeadRestrictedPanel
                               title="Información restringida"
                               items={commonRestricted}
                               canReveal={canReveal}
                               emptyText="Social Security y clave de seguridad sin capturar."
                             />
+)}
                           </div>
                         </section>
 
@@ -154,6 +180,7 @@ export default async function LeadDetailPage({
                           </div>
                           {lineDef && editData.lineValues ? (
                             <LeadLineDetails
+                              hidden={hidden}
                               code={lineDef.code}
                               values={editData.lineValues}
                               dob={lead.dob}
