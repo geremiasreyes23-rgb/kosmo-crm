@@ -79,6 +79,11 @@ const EXTRA_PERMISSIONS: [string, string][] = [
   // Super Admin (vía allKeys) porque un supervisor también modera el feed
   // de su equipo.
   ["feed", "moderate"],
+  // Control Financiero (Dashboard → Control Financiero): ver las finanzas de
+  // la empresa y registrar/editar gastos. Admin recibe ambos (vía allKeys);
+  // Manager solo "view" (más abajo); Agent y Viewer, ninguno.
+  ["finance", "view"],
+  ["finance", "manage"],
 ];
 
 function generateTempPassword(): string {
@@ -146,6 +151,7 @@ async function main() {
     "reports:export",
     "activities:review",
     "feed:moderate",
+    "finance:view",
   ]);
   await grant("Agent", businessResources.flatMap((r) => [`${r}:view`, `${r}:create`, `${r}:edit`]));
   await grant("Viewer", businessResources.map((r) => `${r}:view`));

@@ -97,7 +97,20 @@ export const VISIBILITY_TREE: VisibilityNode[] = [
     label: "Módulos del menú",
     kind: "group",
     children: NAV_MODULES.map((m) =>
-      m.key === "/leads"
+      m.key === "/dashboard"
+        ? {
+            key: moduleKey(m.key),
+            label: m.label,
+            kind: "module" as const,
+            children: [
+              {
+                key: "dashboard.finance",
+                label: "Vista Control Financiero (además requiere el permiso de finanzas)",
+                kind: "tab" as const,
+              },
+            ],
+          }
+        : m.key === "/leads"
         ? {
             key: moduleKey(m.key),
             label: m.label,

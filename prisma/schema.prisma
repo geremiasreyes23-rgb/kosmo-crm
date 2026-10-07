@@ -83,6 +83,9 @@ model User {
   dailyReportsReviewed  DailyReport[] @relation("DailyReportReviewer")
   dailyReportDrafts     DailyReportDraft[]
   visibilityOverrides   UserVisibilityOverride[]
+  financeTransactionsCreated FinanceTransaction[] @relation("FinanceTxCreatedBy")
+  financeTransactionsAsEmployee FinanceTransaction[] @relation("FinanceTxEmployee")
+  financeRecurringCreated FinanceRecurringExpense[] @relation("FinanceRecurringCreatedBy")
   leadsSubmitted        Lead[]   @relation("LeadSubmittedBy")
   appointments          Appointment[]
   notifications         Notification[]
@@ -1652,4 +1655,97 @@ model FeedMention {
   createdAt DateTime @default(now())
 
   @@index([mentionedUserId])
+}
+
+// ───────────── Control Financiero (Dashboard → Control Financiero) ─────────────
+// Movimientos de dinero registrados a mano (gastos e ingresos) y gastos
+// recurrentes. Los pagos de comisiones a agentes y las comisiones cobradas
+// a aseguradoras NO se duplican aquí: se leen de Commission y se suman en
+// el cálculo (ver src/lib/finance/calc.ts).
+
+enum FinanceKind {
+  EXPENSE
+  INCOME
+}
+
+enum FinanceStatus {
+  PAID
+  PENDING
+  SCHEDULED
+}
+
+enum FinancePaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+  DEBIT
+  OTHER
+}
+
+enum FinanceFrequency {
+  WEEKLY
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
+enum FinanceRecurringStatus {
+  ACTIVE
+  PAUSED
+}
+
+model FinanceTransaction {
+  id            String                @id @default(cuid())
+  kind          FinanceKind           @default(EXPENSE)
+  description   String
+  // Clave de categoría (src/lib/finance/constants.ts): PAYROLL, AGENTS,
+  // PLATFORMS, SERVICES, OPERATIONS, PURCHASES, MARKETING, TECHNOLOGY,
+  // OTHER — o, para ingresos, COMMISSIONS, SERVICES_INCOME, OTHER_INCOME.
+  category      String
+  amount        Float
+  date          DateTime              @db.Date
+  paymentMethod FinancePaymentMethod?
+  status        FinanceStatus         @default(PAID)
+  provider      String?
+  notes         String?
+  // Comprobante (factura, recibo, imagen o PDF) — data URL, igual que el
+  // resto de archivos del CRM. Se sirve por /api/finance/receipt.
+  receiptFileName String?
+  receiptDataUrl  String?
+  // Pago de personal / agentes.
+  employeeUserId String?
+  employee       User?                @relation("FinanceTxEmployee", fields: [employeeUserId], references: [id], onDelete: SetNull)
+  employeeName   String?
+  paymentType    String?              // SALARY | COMMISSION | BONUS | OTHER
+  // Si nació de un gasto recurrente.
+  recurringId    String?
+  recurring      FinanceRecurringExpense? @relation(fields: [recurringId], references: [id], onDelete: SetNull)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  createdById    String
+  createdBy      User                 @relation("FinanceTxCreatedBy", fields: [createdById], references: [id])
+
+  @@index([date])
+  @@index([status])
+  @@index([kind, date])
+}
+
+model FinanceRecurringExpense {
+  id              String                 @id @default(cuid())
+  description     String
+  category        String
+  amount          Float
+  frequency       FinanceFrequency       @default(MONTHLY)
+  // Solo para frecuencia CUSTOM: cada cuántos días.
+  intervalDays    Int?
+  nextPaymentDate DateTime               @db.Date
+  paymentMethod   FinancePaymentMethod?
+  status          FinanceRecurringStatus @default(ACTIVE)
+  provider        String?
+  notes           String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  createdById     String
+  createdBy       User                   @relation("FinanceRecurringCreatedBy", fields: [createdById], references: [id])
+  transactions    FinanceTransaction[]
 }

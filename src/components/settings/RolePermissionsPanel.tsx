@@ -72,6 +72,8 @@ const EXTRA_LABEL: Record<string, string> = {
   "activities:review": "Revisar/aprobar reportes diarios de otros",
   "audit:view": "Ver el registro de auditoría",
   "feed:moderate": "Moderar el feed (fijar/editar/eliminar publicaciones ajenas)",
+  "finance:view": "Ver el Control Financiero (ingresos, gastos y rentabilidad)",
+  "finance:manage": "Registrar y editar gastos e ingresos en el Control Financiero",
 };
 
 const ROLE_DESCRIPTION_FALLBACK: Record<string, string> = {

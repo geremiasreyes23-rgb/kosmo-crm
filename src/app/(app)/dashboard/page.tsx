@@ -6,6 +6,10 @@ import { SimpleBarChart } from "@/components/charts/SimpleBarChart";
 import { SimpleLineChart } from "@/components/charts/SimpleLineChart";
 import { Select } from "@/components/ui/Field";
 import { requireUser } from "@/lib/auth";
+import { canViewFinance } from "@/lib/finance/access";
+import { DashboardViewSwitch } from "@/components/finance/DashboardViewSwitch";
+import { FinanceDashboard } from "@/components/finance/FinanceDashboard";
+import { getFinancePageData } from "./finance-data";
 import {
   getDashboardSummary,
   getSalesByLineChart,
@@ -31,8 +35,25 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ vista?: string; periodo?: string }>;
+}) {
   const user = await requireUser();
+  const params = await searchParams;
+  // Segunda vista: Control Financiero (solo con permiso finance:view).
+  const financeAllowed = await canViewFinance(user);
+  if (financeAllowed && params.vista === "finanzas") {
+    const financeData = await getFinancePageData(user, params.periodo);
+    return (
+      <div>
+        <DashboardViewSwitch active="finance" />
+        <FinanceDashboard data={financeData} />
+      </div>
+    );
+  }
+
   const [s, salesByLineChart, salesTrendChart, agentPerformance, turning65Alerts, upcomingTasks, upcomingAppointments] =
     await Promise.all([
       getDashboardSummary(user),
@@ -46,6 +67,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
+      {financeAllowed && <DashboardViewSwitch active="general" />}
       <PageHeader
         title="Dashboard"
         description="Resumen general de la operación de Alliance Insurance"
