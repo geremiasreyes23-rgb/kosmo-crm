@@ -5,6 +5,7 @@ import { Paperclip, X, Send, Save } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Field";
 import { RecipientPicker } from "./RecipientPicker";
+import { OVERLAY_MAX_HEIGHT, OVERLAY_TOP_CLASSES, OverlayPortal, useScrollLock } from "@/components/ui/Overlay";
 import type { MailRecipientOption, MailSettingsVM } from "@/app/(app)/mail/data";
 import type { AttachmentInput, SendMessageInput } from "@/app/(app)/mail/actions";
 
@@ -138,11 +139,13 @@ export function ComposeModal({
     handleClose();
   }
 
+  useScrollLock(open);
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-t-xl bg-[var(--surface-card)] shadow-2xl sm:rounded-xl">
+    <OverlayPortal>
+    <div className={`z-50 bg-black/40 ${OVERLAY_TOP_CLASSES}`}>
+      <div className={`flex w-full max-w-2xl flex-col rounded-xl bg-[var(--surface-card)] shadow-2xl ${OVERLAY_MAX_HEIGHT}`}>
         <div className="flex items-center justify-between border-b border-[var(--border-hairline)] px-5 py-3.5">
           <h2 className="text-sm font-semibold">Nuevo correo interno</h2>
           <button
@@ -209,5 +212,6 @@ export function ComposeModal({
         </div>
       </div>
     </div>
+    </OverlayPortal>
   );
 }

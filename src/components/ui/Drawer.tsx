@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { useScrollLock } from "./Overlay";
 
 /**
  * Panel lateral deslizante (estilo Bitrix24) — se usa para crear/editar
@@ -53,6 +54,9 @@ export function Drawer({
   useEffect(() => {
     setPortalReady(true);
   }, []);
+
+  // La página de atrás no se desplaza mientras el panel está abierto.
+  useScrollLock(open);
 
   useEffect(() => {
     let raf1: number;
@@ -135,7 +139,7 @@ export function Drawer({
             </button>
           )}
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
         {footer && (
           <div className="flex items-center justify-end gap-2 border-t border-[var(--border-hairline)] px-5 py-3.5">
             {footer}

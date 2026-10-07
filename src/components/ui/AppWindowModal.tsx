@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { useScrollLock } from "./Overlay";
 
 /**
  * Ventana de aplicación grande centrada sobre el contenido actual — a
@@ -59,14 +60,9 @@ export function AppWindowModal({
 
   // El Dashboard de atrás no debe poder desplazarse mientras el modal está
   // abierto — si no, se alcanza a hacer scroll "a través" del overlay.
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [open]);
+  // (Antes solo se bloqueaba <body>, pero el scroll real de la página vive
+  // en el panel principal — useScrollLock bloquea ambos.)
+  useScrollLock(open);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -102,7 +98,7 @@ export function AppWindowModal({
         >
           <X className="h-4.5 w-4.5" />
         </button>
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <div className="flex-1 overflow-y-auto overscroll-contain">{children}</div>
       </div>
     </div>,
     document.body

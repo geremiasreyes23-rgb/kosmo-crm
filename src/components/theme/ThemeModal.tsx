@@ -4,6 +4,7 @@ import { Check, Palette, RotateCcw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DEFAULT_THEME, THEME_OPTIONS, type ThemeOption } from "@/lib/themes";
 import { useTheme } from "./ThemeProvider";
+import { OVERLAY_MAX_HEIGHT, OVERLAY_TOP_CLASSES, OverlayPortal, useScrollLock } from "@/components/ui/Overlay";
 
 /**
  * Selector de tema visual — Avatar → Tema del sistema (sin paso
@@ -13,18 +14,23 @@ import { useTheme } from "./ThemeProvider";
  * acá el contenido son 4 tarjetas de previsualización, no un formulario
  * corto.
  *
- * Deliberadamente NO usa un portal a document.body (a diferencia de
- * AppWindowModal/Drawer) — no lo necesita, y así se queda dentro del árbol
- * normal de la app, igual que Modal.tsx.
+ * Igual que el resto de ventanas: se monta en <body>, aparece arriba de la
+ * pantalla y bloquea el scroll de la página mientras está abierto
+ * (ver components/ui/Overlay.tsx).
  */
 export function ThemeModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { theme, setTheme } = useTheme();
+  useScrollLock(open);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-2xl rounded-xl bg-[var(--surface-card)] shadow-xl">
+    <OverlayPortal>
+    <div
+      className={`z-50 bg-black/40 ${OVERLAY_TOP_CLASSES}`}
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className={`flex w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-[var(--surface-card)] shadow-xl ${OVERLAY_MAX_HEIGHT}`}>
         <div className="flex items-center justify-between border-b border-[var(--border-hairline)] px-5 py-3.5">
           <div className="flex items-center gap-2.5">
             <Palette className="h-4.5 w-4.5 text-[var(--brand-500)]" />
@@ -44,7 +50,7 @@ export function ThemeModal({ open, onClose }: { open: boolean; onClose: () => vo
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2">
+        <div className="grid min-h-0 grid-cols-1 gap-3 overflow-y-auto overscroll-contain p-5 sm:grid-cols-2">
           {THEME_OPTIONS.map((option) => (
             <ThemeCard
               key={option.value}
@@ -68,6 +74,7 @@ export function ThemeModal({ open, onClose }: { open: boolean; onClose: () => vo
         </div>
       </div>
     </div>
+    </OverlayPortal>
   );
 }
 

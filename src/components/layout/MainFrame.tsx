@@ -41,7 +41,7 @@ export function MainFrame({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className={cn("min-h-0 flex-1 overflow-y-auto", !isMessenger && "p-4 md:p-6")}>
+    <div data-scroll-container className={cn("min-h-0 flex-1 overflow-y-auto", !isMessenger && "p-4 md:p-6")}>
       {children}
     </div>
   );

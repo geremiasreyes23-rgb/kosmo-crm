@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { OVERLAY_MAX_HEIGHT, OVERLAY_TOP_CLASSES, OverlayPortal, useScrollLock } from "@/components/ui/Overlay";
 
 /** Ventana modal del Control Financiero — mismo lenguaje visual que el
  * modal de Reporte diario (tarjeta amplia, encabezado con ícono, pie fijo). */
@@ -24,6 +25,7 @@ export function FinanceDialog({
   footer: ReactNode;
   width?: string;
 }) {
+  useScrollLock(open);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -33,14 +35,15 @@ export function FinanceDialog({
 
   if (!open) return null;
   return (
+    <OverlayPortal>
     <div
-      className="animate-kosmo-fade-in fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-3 backdrop-blur-[2px] sm:p-6"
+      className={`animate-kosmo-fade-in z-[60] bg-black/45 backdrop-blur-[2px] ${OVERLAY_TOP_CLASSES}`}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
         role="dialog"
         aria-modal="true"
-        className={`animate-kosmo-fade-in-scale flex max-h-[calc(100vh-1.5rem)] w-full ${width} flex-col overflow-hidden rounded-2xl bg-[var(--surface-card)] shadow-2xl`}
+        className={`animate-kosmo-fade-in-scale flex w-full ${width} flex-col overflow-hidden rounded-2xl bg-[var(--surface-card)] shadow-2xl ${OVERLAY_MAX_HEIGHT}`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-[var(--border-hairline)] px-6 py-5 sm:px-8">
           <div className="flex items-center gap-4">
@@ -61,12 +64,13 @@ export function FinanceDialog({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-8">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-6 sm:px-8">{children}</div>
         <div className="flex flex-col-reverse gap-2 border-t border-[var(--border-hairline)] bg-[var(--surface-sunken)] px-6 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-8">
           {footer}
         </div>
       </div>
     </div>
+    </OverlayPortal>
   );
 }
 

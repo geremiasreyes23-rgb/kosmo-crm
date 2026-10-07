@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, CalendarClock, ClipboardList, Clock, Save, Send, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNotifyToast } from "@/components/notifications/ToastNotificationProvider";
+import { OVERLAY_MAX_HEIGHT, OVERLAY_TOP_CLASSES, OverlayPortal, useScrollLock } from "@/components/ui/Overlay";
 import {
   getDailyReportModalStateAction,
   saveDailyReportDraftAction,
@@ -226,6 +227,8 @@ export function DailyReportProvider({
     router.refresh();
   }
 
+  useScrollLock(enabled && open);
+
   // Escape cierra (igual que la X).
   useEffect(() => {
     if (!open) return;
@@ -249,8 +252,9 @@ export function DailyReportProvider({
     <DailyReportContext.Provider value={value}>
       {children}
       {enabled && open && (
+        <OverlayPortal>
         <div
-          className="animate-kosmo-fade-in fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px] sm:p-6"
+          className={`animate-kosmo-fade-in z-[60] bg-black/45 backdrop-blur-[2px] ${OVERLAY_TOP_CLASSES}`}
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) close();
           }}
@@ -259,7 +263,7 @@ export function DailyReportProvider({
             role="dialog"
             aria-modal="true"
             aria-labelledby="daily-report-title"
-            className="animate-kosmo-fade-in-scale flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-[var(--surface-card)] shadow-2xl"
+            className={`animate-kosmo-fade-in-scale flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-[var(--surface-card)] shadow-2xl ${OVERLAY_MAX_HEIGHT}`}
           >
             <div className="flex items-start justify-between gap-4 border-b border-[var(--border-hairline)] px-8 py-6">
               <div className="flex items-center gap-4">
@@ -283,7 +287,7 @@ export function DailyReportProvider({
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-8 py-7">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-8 py-7">
               <div className="flex items-start gap-3.5 rounded-xl border border-[var(--brand-100)] bg-[var(--brand-50)] px-5 py-4 text-sm leading-relaxed text-[var(--ink-secondary)]">
                 <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-[var(--brand-600)]" />
                 <p>
@@ -354,6 +358,7 @@ export function DailyReportProvider({
             {source === "auto" && <span className="sr-only">Recordatorio automático</span>}
           </div>
         </div>
+        </OverlayPortal>
       )}
     </DailyReportContext.Provider>
   );

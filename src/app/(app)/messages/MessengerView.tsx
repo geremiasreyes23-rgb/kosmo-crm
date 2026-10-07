@@ -7,6 +7,7 @@ import { ChatPanel } from "@/components/messenger/ChatPanel";
 import { NewChatModal } from "@/components/messenger/NewChatModal";
 import { UserProfileCard } from "@/components/messenger/UserProfileCard";
 import { useMessenger } from "@/components/messenger/MessengerProvider";
+import { OverlayPortal, useScrollLock } from "@/components/ui/Overlay";
 
 export function MessengerView() {
   const {
@@ -30,6 +31,7 @@ export function MessengerView() {
   const [search, setSearch] = useState("");
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  useScrollLock(!!lightboxUrl);
   const [mobileShowChat, setMobileShowChat] = useState(false);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
@@ -153,6 +155,7 @@ export function MessengerView() {
       />
 
       {lightboxUrl && (
+        <OverlayPortal>
         <div
           className="animate-kosmo-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
           onClick={() => setLightboxUrl(null)}
@@ -173,6 +176,7 @@ export function MessengerView() {
             onClick={(e) => e.stopPropagation()}
           />
         </div>
+        </OverlayPortal>
       )}
     </div>
   );
